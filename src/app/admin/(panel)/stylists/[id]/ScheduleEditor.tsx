@@ -36,8 +36,8 @@ export function ScheduleEditor({ stylistId, hours: initialHours, breaks: initial
     start(async () => {
       const r = await setStylistSchedule(
         stylistId,
-        hours.map((h) => ({ weekday: h.weekday, starts_at: h.start, ends_at: h.end })),
-        breaks.map((b) => ({ weekday: b.weekday, starts_at: b.start, ends_at: b.end, label: b.label || undefined })),
+        hours.map((h) => ({ weekday: h.weekday, startsAt: h.start, endsAt: h.end })),
+        breaks.map((b) => ({ weekday: b.weekday, startsAt: b.start, endsAt: b.end, label: b.label || undefined })),
       )
       if (r.ok) toast.success(r.message)
       else toast.error(r.error)

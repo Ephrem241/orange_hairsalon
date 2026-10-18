@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -50,7 +51,7 @@ describe('booking access cookie', () => {
 
 describe('request validation', () => {
   const valid = {
-    serviceId: '00000000-0000-4000-8000-000000000001',
+    serviceId: 'kh7d2ccqx1xqvsg0g9pdh2fd457s3jt0',
     stylistId: null,
     startsAt: '2026-10-19T05:00:00.000Z',
     fullName: '  Hana Tesfaye ',
@@ -86,15 +87,21 @@ describe('request validation', () => {
 })
 
 describe('engine error mapping', () => {
-  it('maps engine codes to actionable responses', () => {
-    expect(toAppError({ message: 'SLOT_TAKEN' })).toMatchObject({ code: 'SLOT_TAKEN', status: 409 })
-    expect(toAppError({ message: 'PAST_CUTOFF' }).message).toMatch(/call the salon/)
-    expect(toAppError({ message: 'permission denied for function x', code: '42501' })).toMatchObject({ code: 'FORBIDDEN', status: 403 })
+  it('maps Convex error codes to actionable responses', () => {
+    expect(toAppError(new ConvexError({ code: 'SLOT_TAKEN' }))).toMatchObject({ code: 'SLOT_TAKEN', status: 409 })
+    expect(toAppError(new ConvexError({ code: 'PAST_CUTOFF' })).message).toMatch(/call the salon/)
+    expect(toAppError(new ConvexError({ code: 'FORBIDDEN' }))).toMatchObject({ code: 'FORBIDDEN', status: 403 })
   })
 
-  it('never leaks unexpected database errors', () => {
-    const err = toAppError({ message: 'duplicate key value violates unique constraint "customers_pkey"' })
+  it('treats argument validation failures as bad input', () => {
+    const err = new Error('[Request ID: 1] Server Error ArgumentValidationError: Value does not match validator.')
+    expect(toAppError(err)).toMatchObject({ code: 'INVALID_INPUT', status: 422 })
+  })
+
+  it('never leaks unexpected server errors', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const err = toAppError(new Error('Uncaught Error: Too many reads in a single function execution'))
     expect(err).toMatchObject({ code: 'UNKNOWN', status: 500 })
-    expect(err.message).not.toMatch(/constraint/)
+    expect(err.message).not.toMatch(/reads/)
   })
 })

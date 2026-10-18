@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/Button'
 import { Field, Honeypot, TextArea, TextInput } from '@/components/ui/Field'
 import { cn } from '@/lib/cn'
 import { formatDuration, formatEtb, initials } from '@/lib/format'
-import { mediaUrl } from '@/lib/media-url'
 import { addDays, formatDateLong, formatIsoDate, formatTime, isIsoDate, salonDate } from '@/lib/time'
 import type { Service, Stylist } from '@/lib/types'
 import { bookingRequestSchema, fieldErrors } from '@/lib/validation'
@@ -293,7 +292,7 @@ function ServiceStep({ services, onSelect }: { services: Service[]; onSelect: (s
               className="group flex w-full gap-4 rounded-sm border border-charcoal/10 bg-white p-3 text-left transition-[border-color,box-shadow] duration-300 hover:border-gold-600 hover:shadow-[0_14px_30px_-20px_rgba(23,21,19,0.5)]"
             >
               <span className="relative size-24 shrink-0 overflow-hidden rounded-sm bg-ivory-300">
-                {s.imagePath && <Image src={mediaUrl(s.imagePath)} alt="" fill sizes="96px" className="object-cover transition-transform duration-700 group-hover:scale-105" />}
+                {s.imagePath && <Image src={s.imagePath} alt="" fill sizes="96px" className="object-cover transition-transform duration-700 group-hover:scale-105" />}
               </span>
               <span className="flex min-w-0 flex-1 flex-col py-1">
                 <span className="flex items-center gap-2">
@@ -348,7 +347,7 @@ function StylistStep({ stylists, onSelect, onBack }: { stylists: Stylist[]; onSe
           <li key={s.id}>
             <button type="button" onClick={() => onSelect(s.slug)} className={option}>
               <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-charcoal-700 font-serif text-lg text-gold">
-                {s.photoPath ? <Image src={mediaUrl(s.photoPath)} alt="" fill sizes="56px" className="object-cover" /> : initials(s.displayName)}
+                {s.photoPath ? <Image src={s.photoPath} alt="" fill sizes="56px" className="object-cover" /> : initials(s.displayName)}
               </span>
               <span className="min-w-0">
                 <span className="flex items-center gap-2 font-serif text-lg">
@@ -473,7 +472,7 @@ function Summary({ service, stylist, time }: { service: Service | null; stylist:
       <div className="overflow-hidden rounded-sm bg-charcoal text-ivory">
         {service.imagePath && (
           <div className="relative hidden aspect-[16/10] lg:block">
-            <Image src={mediaUrl(service.imagePath)} alt="" fill sizes="22rem" className="object-cover opacity-80" />
+            <Image src={service.imagePath} alt="" fill sizes="22rem" className="object-cover opacity-80" />
           </div>
         )}
         <div className="space-y-4 p-6">

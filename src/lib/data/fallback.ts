@@ -2,7 +2,7 @@
  * Content used when the database is not configured.
  *
  * - Verified settings, hours and genuine salon photography are always safe to
- *   show (they mirror supabase/migrations/…_seed_verified_content.sql).
+ *   show (they mirror the seed in convex/seed.ts).
  * - Demo services and stylists appear only when DEMO_CONTENT=true outside
  *   production, and every one of them is labelled as demo content.
  */

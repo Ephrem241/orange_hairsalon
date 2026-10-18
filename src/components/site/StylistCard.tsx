@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import { initials } from '@/lib/format'
-import { mediaUrl } from '@/lib/media-url'
 import type { Stylist } from '@/lib/types'
 import { DemoBadge } from './DemoBadge'
 
@@ -10,7 +9,7 @@ export function StylistCard({ stylist }: { stylist: Stylist }) {
       <div className="relative aspect-[4/5] overflow-hidden bg-charcoal-700">
         {stylist.photoPath ? (
           <Image
-            src={mediaUrl(stylist.photoPath)}
+            src={stylist.photoPath}
             alt={`Portrait of ${stylist.displayName}`}
             fill
             sizes="(min-width: 1024px) 22vw, (min-width: 640px) 45vw, 90vw"

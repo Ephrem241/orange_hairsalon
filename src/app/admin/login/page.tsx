@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Wordmark } from '@/components/site/Wordmark'
-import { isSupabaseConfigured } from '@/lib/env'
+import { isConvexConfigured } from '@/lib/env'
 import { LoginForm } from './LoginForm'
 
 export const metadata: Metadata = { title: 'Staff sign in' }
@@ -26,11 +26,11 @@ export default function LoginPage() {
           <h1 className="mt-10 font-serif text-3xl lg:mt-0">Staff sign in</h1>
           <p className="mt-2 text-sm text-taupe-700">For Orange Salon team members only. Accounts are created by the owner.</p>
           <div className="mt-8">
-            {isSupabaseConfigured ? (
+            {isConvexConfigured ? (
               <LoginForm />
             ) : (
               <p className="rounded-sm border border-dashed border-gold-700/50 bg-white p-4 text-sm text-taupe-700">
-                The dashboard needs a Supabase project. Follow <strong>docs/SETUP.md</strong> to connect the database and create
+                The dashboard needs a Convex deployment. Follow <strong>docs/SETUP.md</strong> to connect the database and create
                 the first administrator.
               </p>
             )}

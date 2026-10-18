@@ -1,11 +1,16 @@
 /**
  * Input schemas shared by the browser (instant feedback) and the server (the
- * authority). The database re-validates everything again on insert.
+ * authority). Convex re-validates everything again on write.
  */
 import { z } from 'zod'
 import { normalizePhone } from '@/lib/phone'
 
 export const REFERENCE_PATTERN = /^OS-[2-9A-HJKMNP-Z]{6}$/
+
+/** Convex document ids. Convex itself checks which table an id belongs to. */
+export const CONVEX_ID_PATTERN = /^[a-z0-9]{20,64}$/
+export const isConvexId = (value: unknown): value is string => typeof value === 'string' && CONVEX_ID_PATTERN.test(value)
+export const convexId = (message = 'Invalid reference.') => z.string().regex(CONVEX_ID_PATTERN, message)
 
 const phone = z
   .string()
@@ -38,8 +43,8 @@ const fullName = z
 const honeypot = z.string().max(0).optional()
 
 export const bookingRequestSchema = z.object({
-  serviceId: z.uuid('Please choose a service.'),
-  stylistId: z.uuid().nullable(),
+  serviceId: convexId('Please choose a service.'),
+  stylistId: convexId().nullable(),
   startsAt: z.iso.datetime({ offset: true, message: 'Please choose a time.' }),
   fullName,
   phone,

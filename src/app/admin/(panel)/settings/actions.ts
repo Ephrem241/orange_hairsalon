@@ -1,12 +1,13 @@
 'use server'
 
+import { api } from '@convex/_generated/api'
 import { refresh, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { ADMIN_ONLY, authorize, type ActionResult } from '@/lib/auth/staff'
 import { toAppError } from '@/lib/booking/errors'
+import { staffMutation } from '@/lib/convex/server'
 import { TAGS } from '@/lib/data/tags'
 import { normalizePhone } from '@/lib/phone'
-import { createSessionClient } from '@/lib/supabase/server'
 
 const httpsOrEmpty = z.string().trim().refine((v) => v === '' || /^https:\/\/[^\s]+$/.test(v), 'Links must start with https://')
 const emailOrEmpty = z.string().trim().refine((v) => v === '' || z.email().safeParse(v).success, 'Enter a valid email.')
@@ -43,16 +44,19 @@ export async function saveBusinessSettings(values: z.input<typeof business>): Pr
   }
   const socials = Object.fromEntries(Object.entries(v.socials).filter(([, url]) => url))
 
-  const db = await createSessionClient()
-  const { error } = await db
-    .from('business_settings')
-    .update({
-      name: v.name, tagline: v.tagline || null, phone, whatsapp, email: v.email.toLowerCase() || null,
-      address_line: v.addressLine || null, city: v.city, map_url: v.mapUrl || null, latitude: lat, longitude: lng,
-      socials, about_story: v.aboutStory || null,
+  try {
+    await staffMutation(api.settings.saveBusiness, {
+      ...v,
+      phone: phone ?? '',
+      whatsapp: whatsapp ?? '',
+      email: v.email.toLowerCase(),
+      latitude: lat,
+      longitude: lng,
+      socials,
     })
-    .eq('id', 1)
-  if (error) return { ok: false, error: toAppError(error).message }
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.settings)
   refresh()
   return { ok: true, message: 'Business details saved.' }
@@ -77,18 +81,11 @@ export async function saveBookingPolicy(values: z.input<typeof policy>): Promise
   if ('error' in auth) return auth.error
   const parsed = policy.safeParse(values)
   if (!parsed.success) return { ok: false, error: `Check “${String(parsed.error.issues[0].path[0])}”: ${parsed.error.issues[0].message}` }
-  const v = parsed.data
-  const db = await createSessionClient()
-  const { error } = await db
-    .from('business_settings')
-    .update({
-      online_booking_enabled: v.onlineBookingEnabled, auto_confirm: v.autoConfirm, require_email: v.requireEmail,
-      allow_customer_cancel: v.allowCustomerCancel, allow_customer_reschedule: v.allowCustomerReschedule,
-      min_lead_minutes: v.minLeadMinutes, max_advance_days: v.maxAdvanceDays, slot_interval_min: v.slotIntervalMin,
-      default_buffer_min: v.defaultBufferMin, cancel_cutoff_hours: v.cancelCutoffHours, policy_text: v.policyText || null,
-    })
-    .eq('id', 1)
-  if (error) return { ok: false, error: toAppError(error).message }
+  try {
+    await staffMutation(api.settings.savePolicy, parsed.data)
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.settings)
   refresh()
   return { ok: true, message: 'Booking policy saved.' }
@@ -104,11 +101,11 @@ export async function saveBusinessHours(values: z.input<typeof hoursInput>): Pro
   const parsed = hoursInput.safeParse(values)
   if (!parsed.success) return { ok: false, error: 'Enter opening and closing times for every open day.' }
   if (parsed.data.some((d) => !d.isClosed && d.opensAt >= d.closesAt)) return { ok: false, error: 'Closing time must be after opening time.' }
-  const db = await createSessionClient()
-  const { error } = await db.from('business_hours').upsert(
-    parsed.data.map((d) => ({ weekday: d.weekday, is_closed: d.isClosed, opens_at: d.isClosed ? null : d.opensAt, closes_at: d.isClosed ? null : d.closesAt })),
-  )
-  if (error) return { ok: false, error: toAppError(error).message }
+  try {
+    await staffMutation(api.settings.saveHours, { days: parsed.data })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.settings)
   refresh()
   return { ok: true, message: 'Opening hours saved.' }
@@ -121,13 +118,11 @@ export async function saveNotificationSettings(values: z.input<typeof notify>): 
   if ('error' in auth) return auth.error
   const parsed = notify.safeParse(values)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
-  const v = parsed.data
-  const db = await createSessionClient()
-  const { error } = await db
-    .from('notification_settings')
-    .update({ email_enabled: v.emailEnabled, whatsapp_enabled: v.whatsappEnabled, reminders_enabled: v.remindersEnabled, salon_alert_email: v.salonAlertEmail.toLowerCase() || null })
-    .eq('id', 1)
-  if (error) return { ok: false, error: toAppError(error).message }
+  try {
+    await staffMutation(api.settings.saveNotifications, { ...parsed.data, salonAlertEmail: parsed.data.salonAlertEmail.toLowerCase() })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   refresh()
   return { ok: true, message: 'Notification settings saved.' }
 }

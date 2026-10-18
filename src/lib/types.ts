@@ -1,4 +1,8 @@
-/** Domain types shared by the public site, booking flow and dashboard. */
+/**
+ * Domain types shared by the public site, booking flow and dashboard.
+ * Media paths (imagePath, photoPath, mediaPath…) are displayable: a site path
+ * ("/images/…") or a Convex file-storage URL.
+ */
 
 export type PriceType = 'fixed' | 'from'
 export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'

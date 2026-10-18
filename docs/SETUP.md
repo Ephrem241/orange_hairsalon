@@ -1,67 +1,59 @@
 # Setup: database, accounts and first administrator
 
-This connects the site to Supabase. That enables online booking, the dashboard, notifications and uploads. Allow about 20 minutes.
+This connects the site to [Convex](https://convex.dev). That enables online booking, the dashboard, notifications and uploads. Allow about 20 minutes.
 
-## 1. Create a Supabase project
+Convex holds everything: the data, the booking engine (`convex/`), staff sign-in (Convex Auth) and uploaded photos and videos. Each project has a **development** deployment (for you and for tests) and a **production** deployment (the live site). They never share data.
 
-1. In [supabase.com](https://supabase.com), create a project.
-   - Region: **eu-central-1 (Frankfurt)** is closest to Addis Ababa among common regions.
-   - Save the database password somewhere safe.
-2. Free-plan organisations allow two active projects. Pause an unused one or upgrade if you hit the limit.
-3. Under **Project Settings → API Keys**, copy:
-   - the **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-   - the **publishable key** (`sb_publishable_…`) → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - the **secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY`. This is server only; never put it in browser code or commit it.
-
-Put these, plus the security secrets below, in `.env.local`:
+## 1. Create the Convex project
 
 ```bash
-cp .env.example .env.local
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"   # BOOKING_COOKIE_SECRET
-node -e "console.log(require('crypto').randomBytes(16).toString('base64url'))"   # RATE_LIMIT_SALT
-node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"   # CRON_SECRET
+npx convex login     # once per computer; opens the browser
+npx convex dev       # first run: create a project (e.g. "orange-salon"), then leave it running
 ```
 
-## 2. Apply the database migrations
+`npx convex dev` writes `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CONVEX_SITE_URL` to `.env.local` and pushes the code in `convex/` every time it changes. Keep it running while you develop (or use `npm run convex:dev`).
 
-The migrations live in `supabase/migrations/`, in this order:
+> **No account yet?** `CONVEX_AGENT_MODE=anonymous npx convex dev` runs a local deployment on this computer instead. Link it to an account later with `npx convex login` followed by `npx convex dev --configure`. Data from the local deployment is not copied across.
 
-1. foundation
-2. tables
-3. security
-4. booking engine
-5. storage
-6. verified seed
-
-**Option A — Supabase CLI (recommended, no Docker needed for remote pushes):**
+## 2. Set the secrets
 
 ```bash
-npx supabase login
-npx supabase init            # only if supabase/config.toml does not exist yet; keep existing migrations
-npx supabase link --project-ref YOUR-PROJECT-REF
-npx supabase db push         # applies every migration in order
+npm run convex:env
 ```
 
-**Option B — SQL Editor:** open each file in order and run it.
+This sets the following on the development deployment:
 
-The final migration seeds only the verified details:
+| Variable | What it is |
+|---|---|
+| `JWT_PRIVATE_KEY`, `JWKS` | Keys Convex Auth uses to sign staff sessions |
+| `SITE_URL` | The website's address (`http://localhost:3000` in development) |
+| `CONVEX_SERVER_SECRET` | Lets the Next.js server — and only it — call the booking API |
+
+It also adds the matching `CONVEX_SERVER_SECRET` and the other local secrets (`BOOKING_COOKIE_SECRET`, `RATE_LIMIT_SALT`, `CRON_SECRET`) to `.env.local`. Running it again rotates the keys and signs everyone out.
+
+Check with `npx convex env list` (it lists names; never paste the values anywhere).
+
+## 3. Seed the verified details
+
+```bash
+npx convex run seed:verified
+```
+
+This writes only the details the salon has confirmed:
 - the name, phone (+251 91 241 9748), address (Ednamoll Street) and opening hours;
 - the real gallery photographs and reels.
 
-**Never run `supabase/seed.demo.sql` on production.** It is a sample menu and team for development projects only, and it ends with the SQL that removes everything it created.
+It is safe to run again: existing rows are left alone.
 
-## 3. Lock down sign-ups
+**Demo data (development only).** To try booking with a sample menu and team:
 
-Staff accounts are created only by an admin. There is no public registration page.
+```bash
+npx convex env set ALLOW_DEMO_SEED true
+npx convex run seed:demo          # every row is flagged as demo and labelled on the site
+npx convex run seed:removeDemo    # deletes all of it again, with any test bookings
+```
 
-In **Authentication → Sign In / Providers**:
-- **Email:** enabled.
-- **Allow new users to sign up:** **off**.
-- Optionally raise the **minimum password length** to 12.
-
-Even if sign-ups were left on, a new account has no `profiles` row and therefore no access. The database treats it as a member of the public.
-
-In **API Settings → Exposed schemas**, keep the default (`public`, `graphql_public`). The `private` schema holds internal functions and must **not** be exposed.
+Never set `ALLOW_DEMO_SEED` on production. `seed:demo` refuses to run without it.
 
 ## 4. Create the first administrator
 
@@ -69,9 +61,13 @@ In **API Settings → Exposed schemas**, keep the default (`public`, `graphql_pu
 npm run admin:create -- --email owner@yoursalon.com --name "Owner Name"
 ```
 
-The command prints a one-time temporary password. Sign in at `/admin/login`, then change it under **Account**. Add the rest of the team from **Staff & access**:
+The command prints a one-time temporary password. Sign in at `/admin/login`, then change it under **Account**.
+
+There is no public sign-up. Staff accounts are created only here or by an admin under **Staff & access**:
 - **Reception:** appointments, clients and messages.
 - **Stylist:** their own diary and schedule. Each stylist login is linked to a stylist profile.
+
+An account without an active staff profile has no dashboard access, and deactivating someone takes effect on their next request.
 
 ## 5. Fill in the salon (Dashboard)
 
@@ -89,6 +85,7 @@ The command prints a one-time temporary password. Sign in at `/admin/login`, the
 4. **Gallery and reviews:**
    - Add verified reviews with their source link.
    - Mark any non-salon imagery as illustrative.
+   - Uploads (JPEG, PNG, WebP or AVIF up to 8 MB; MP4 or WebM up to 50 MB) are stored in Convex file storage.
 5. Make a test booking at `/book` and confirm it from **Appointments**.
 
 ## 6. Notifications (optional)
@@ -99,14 +96,18 @@ The command prints a one-time temporary password. Sign in at `/admin/login`, the
 | WhatsApp | A WhatsApp Business Platform (Cloud API) app in Meta Business Manager, plus message templates approved for each event. Set `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_TEMPLATE_*`. Each template body takes {{1}} name, {{2}} service, {{3}} date, {{4}} time, {{5}} reference. | Skipped. A wa.me chat link is **not** used as a notification. |
 | Reminders | The daily cron (see DEPLOYMENT.md) sends reminders for the next day's confirmed appointments. | — |
 
+These variables belong to the Next.js app (`.env.local`, or Vercel), not to Convex.
+
 **Settings → Notifications** shows whether each provider is connected. **Notifications** lists every attempt as sent, failed or skipped, with a Retry button.
 
-## 7. Verify against the live project
+## 7. Verify against the development deployment
 
-Use a **development** project, never production. Then run:
+Use the **development** deployment, never production, with the demo seed loaded. Then run:
 
 ```bash
 npm run test:integration
 ```
 
-This fires ten simultaneous bookings at one slot and expects exactly one to succeed. It also checks that the publishable key cannot read appointments, customers or private contact details. It creates and removes its own temporary records.
+This fires ten simultaneous bookings at one slot and expects exactly one to succeed. It also checks that the booking API refuses calls without the server secret, that dashboard functions refuse callers without a staff session, and that public queries expose no private contact details. Its one booking is cancelled afterwards.
+
+Set `TEST_ADMIN_EMAIL` and `TEST_ADMIN_PASSWORD` (an admin on that deployment) to also check an upload end to end.

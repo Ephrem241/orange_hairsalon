@@ -1,3 +1,5 @@
+import { api } from '@convex/_generated/api'
+import type { Id } from '@convex/_generated/dataModel'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -6,8 +8,9 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { listAppointments } from '@/lib/admin/data'
 import { FRONT_DESK, requirePageStaff } from '@/lib/auth/staff'
 import { formatEtb, formatPhone, telHref } from '@/lib/format'
-import { createSessionClient } from '@/lib/supabase/server'
+import { staffQuery } from '@/lib/convex/server'
 import { formatDateShort, formatTime } from '@/lib/time'
+import { isConvexId } from '@/lib/validation'
 import { CustomerForm } from './CustomerForm'
 
 export const metadata: Metadata = { title: 'Client' }
@@ -15,10 +18,9 @@ export const metadata: Metadata = { title: 'Client' }
 export default async function CustomerPage({ params }: PageProps<'/admin/customers/[id]'>) {
   if (!(await requirePageStaff(FRONT_DESK))) return <NotPermitted />
   const { id } = await params
-  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
-  const db = await createSessionClient()
-  const [{ data: c }, history] = await Promise.all([
-    db.from('customers').select('id, full_name, phone_e164, email, staff_notes, created_at').eq('id', id).maybeSingle(),
+  if (!isConvexId(id)) notFound()
+  const [c, history] = await Promise.all([
+    staffQuery(api.customers.get, { id: id as Id<'customers'> }),
     listAppointments({ customerId: id, ascending: false, limit: 200 }),
   ])
   if (!c) notFound()
@@ -29,13 +31,13 @@ export default async function CustomerPage({ params }: PageProps<'/admin/custome
     <>
       <PageHeader
         back={{ href: '/admin/customers', label: 'Customers' }}
-        title={c.full_name}
-        description={<>Client since {formatDateShort(c.created_at)} · <a href={telHref(c.phone_e164)} className="hover:text-gold-700">{formatPhone(c.phone_e164)}</a></>}
+        title={c.fullName}
+        description={<>Client since {formatDateShort(new Date(c._creationTime))} · <a href={telHref(c.phoneE164)} className="hover:text-gold-700">{formatPhone(c.phoneE164)}</a></>}
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_2fr]">
         <div className="space-y-6">
           <Card title="Profile">
-            <CustomerForm id={c.id} fullName={c.full_name} email={c.email ?? ''} staffNotes={c.staff_notes ?? ''} />
+            <CustomerForm id={c._id} fullName={c.fullName} email={c.email ?? ''} staffNotes={c.staffNotes ?? ''} />
           </Card>
           <Card title="Summary">
             <dl className="grid grid-cols-2 gap-4 text-sm">

@@ -8,6 +8,7 @@ import { can, requirePageStaff } from '@/lib/auth/staff'
 import { cn } from '@/lib/cn'
 import { formatDuration, formatEtb, formatPhone, telHref } from '@/lib/format'
 import { formatDateLong, formatDateShort, formatTime, hasStarted } from '@/lib/time'
+import { isConvexId } from '@/lib/validation'
 import { AppointmentActions } from './AppointmentActions'
 
 export const metadata: Metadata = { title: 'Appointment' }
@@ -32,7 +33,7 @@ const NOTIFY_TONE: Record<string, string> = {
 export default async function AppointmentPage({ params }: PageProps<'/admin/appointments/[id]'>) {
   const staff = (await requirePageStaff())!
   const { id } = await params
-  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
+  if (!isConvexId(id)) notFound()
   const [detail, stylists] = await Promise.all([getAppointment(id), listStylists()])
   if (!detail) notFound()
   const { appointment: a, events, notifications } = detail
@@ -103,7 +104,7 @@ export default async function AppointmentPage({ params }: PageProps<'/admin/appo
                 <li key={e.id} className="px-5 py-3 text-sm">
                   <p className="font-medium">{EVENT_LABEL[e.event] ?? e.event}</p>
                   <p className="text-xs text-taupe-700">
-                    {e.actor_type === 'customer' ? 'Client (online)' : e.actor_type === 'staff' ? 'Staff' : 'System'} · {formatDateShort(e.created_at)} {formatTime(e.created_at)}
+                    {e.actorType === 'customer' ? 'Client (online)' : e.actorType === 'staff' ? 'Staff' : 'System'} · {formatDateShort(e.createdAt)} {formatTime(e.createdAt)}
                   </p>
                   {typeof e.details?.reason === 'string' && <p className="mt-1 text-xs">“{e.details.reason}”</p>}
                   {e.event === 'rescheduled' && typeof e.details?.from === 'string' && typeof e.details?.to === 'string' && (

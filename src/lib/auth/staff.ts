@@ -1,13 +1,16 @@
 import 'server-only'
+import { api } from '@convex/_generated/api'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
 import { redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import { cache } from 'react'
-import { isSupabaseConfigured } from '@/lib/env'
-import { createSessionClient } from '@/lib/supabase/server'
+import { isConvexConfigured } from '@/lib/env'
 import type { StaffRole } from '@/lib/types'
 
 export type Staff = {
   id: string
+  profileId: string
   email: string | null
   fullName: string
   role: StaffRole
@@ -19,22 +22,16 @@ export const ADMIN_ONLY: StaffRole[] = ['admin']
 
 /** The signed-in, active staff member for this request (deduplicated per request). */
 export const getStaff = cache(async (): Promise<Staff | null> => {
-  if (!isSupabaseConfigured) return null
-  const supabase = await createSessionClient()
-  const { data: auth } = await supabase.auth.getUser()
-  if (!auth.user) return null
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, full_name, role, stylist_id, is_active')
-    .eq('id', auth.user.id)
-    .maybeSingle()
-  if (!profile || !profile.is_active) return null
-  return {
-    id: profile.id,
-    email: auth.user.email ?? null,
-    fullName: profile.full_name,
-    role: profile.role,
-    stylistId: profile.stylist_id,
+  if (!isConvexConfigured) return null
+  const token = await convexAuthNextjsToken()
+  if (!token) return null
+  try {
+    const me = await fetchQuery(api.staff.me, {}, { token })
+    if (!me) return null
+    return { id: me.userId, profileId: me.profileId, email: me.email, fullName: me.fullName, role: me.role, stylistId: me.stylistId }
+  } catch (error) {
+    console.error('[auth] could not load the staff profile', (error as Error).message)
+    return null
   }
 })
 

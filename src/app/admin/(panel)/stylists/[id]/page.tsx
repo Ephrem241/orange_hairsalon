@@ -1,9 +1,11 @@
+import { api } from '@convex/_generated/api'
+import type { Id } from '@convex/_generated/dataModel'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { Card, NotPermitted, PageHeader } from '@/components/admin/ui'
-import { listServices, listStylists } from '@/lib/admin/data'
+import { listServices, listStylists, upcomingTimeOff } from '@/lib/admin/data'
 import { ADMIN_ONLY, requirePageStaff } from '@/lib/auth/staff'
-import { createSessionClient } from '@/lib/supabase/server'
+import { staffQuery } from '@/lib/convex/server'
 import { ScheduleEditor } from './ScheduleEditor'
 import { StylistProfileForm } from './StylistProfileForm'
 import { StylistServicesForm } from './StylistServicesForm'
@@ -27,14 +29,9 @@ export default async function StylistPage({ params }: PageProps<'/admin/stylists
 
   const stylist = stylists.find((s) => s.id === id)
   if (!stylist) notFound()
-  const db = await createSessionClient()
-  const [{ data: contact }, { data: hours }, { data: breaks }, { data: timeOff }] = await Promise.all([
-    db.from('stylist_contacts').select('phone, email').eq('stylist_id', id).maybeSingle(),
-    db.from('working_hours').select('weekday, starts_at, ends_at').eq('stylist_id', id).order('weekday').order('starts_at'),
-    db.from('stylist_breaks').select('weekday, starts_at, ends_at, label').eq('stylist_id', id).order('weekday').order('starts_at'),
-    db.from('time_off').select('id, starts_at, ends_at, reason').eq('stylist_id', id).gte('ends_at', new Date().toISOString()).order('starts_at'),
-  ])
-  const hhmm = (t: string) => t.slice(0, 5)
+  const [detail, timeOff] = await Promise.all([staffQuery(api.stylists.detail, { id: stylist.id as Id<'stylists'> }), upcomingTimeOff(stylist.id)])
+  if (!detail) notFound()
+  const { contact, hours, breaks } = detail
 
   return (
     <>
@@ -48,14 +45,14 @@ export default async function StylistPage({ params }: PageProps<'/admin/stylists
             <StylistServicesForm stylistId={stylist.id} selected={stylist.serviceIds} services={services.map((s) => ({ id: s.id, name: s.name, isActive: s.isActive }))} />
           </Card>
           <Card title="Upcoming time off">
-            <TimeOffManager stylistId={stylist.id} entries={(timeOff ?? []).map((t) => ({ id: t.id, startsAt: t.starts_at, endsAt: t.ends_at, reason: t.reason }))} />
+            <TimeOffManager stylistId={stylist.id} entries={timeOff} />
           </Card>
         </div>
         <Card title="Weekly hours & breaks" className="xl:col-span-2">
           <ScheduleEditor
             stylistId={stylist.id}
-            hours={(hours ?? []).map((h) => ({ weekday: h.weekday, start: hhmm(h.starts_at), end: hhmm(h.ends_at) }))}
-            breaks={(breaks ?? []).map((b) => ({ weekday: b.weekday, start: hhmm(b.starts_at), end: hhmm(b.ends_at), label: b.label ?? '' }))}
+            hours={hours.map((h) => ({ weekday: h.weekday, start: h.startsAt, end: h.endsAt }))}
+            breaks={breaks.map((b) => ({ weekday: b.weekday, start: b.startsAt, end: b.endsAt, label: b.label ?? '' }))}
           />
         </Card>
       </div>

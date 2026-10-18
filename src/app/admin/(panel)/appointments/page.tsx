@@ -1,3 +1,4 @@
+import { api } from '@convex/_generated/api'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -8,7 +9,7 @@ import { can, requirePageStaff } from '@/lib/auth/staff'
 import { cn } from '@/lib/cn'
 import { formatEtb, formatPhone } from '@/lib/format'
 import { STATUS } from '@/lib/status'
-import { createSessionClient } from '@/lib/supabase/server'
+import { publicQuery, staffQuery } from '@/lib/convex/server'
 import { addDays, formatDateShort, formatIsoDate, formatTime, formatTime24, isIsoDate, salonDate, salonInstant, weekdayOf } from '@/lib/time'
 import type { AppointmentStatus } from '@/lib/types'
 
@@ -150,14 +151,15 @@ const PX_PER_MIN = 1.4
 async function DayView({ date, stylists, canCreate }: { date: string; stylists: Awaited<ReturnType<typeof listStylists>>; canCreate: boolean }) {
   const start = salonInstant(date, '00:00')
   const end = salonInstant(addDays(date, 1), '00:00')
-  const db = await createSessionClient()
-  const [appointments, { data: hours }, { data: timeOff }] = await Promise.all([
+  const [appointments, allHours, offRows] = await Promise.all([
     listAppointments({ from: start, to: end }),
-    db.from('business_hours').select('opens_at, closes_at, is_closed').eq('weekday', weekdayOf(date)).maybeSingle(),
-    db.from('time_off').select('id, stylist_id, starts_at, ends_at, reason').lt('starts_at', end).gt('ends_at', start),
+    publicQuery(api.public.businessHours, {}),
+    staffQuery(api.stylists.timeOffInRange, { from: Date.parse(start), to: Date.parse(end) }),
   ])
-  const open = hours && !hours.is_closed ? String(hours.opens_at).slice(0, 5) : '08:00'
-  const close = hours && !hours.is_closed ? String(hours.closes_at).slice(0, 5) : '20:00'
+  const hours = allHours.find((h) => h.weekday === weekdayOf(date))
+  const timeOff = offRows.map((t) => ({ id: t._id, stylistId: t.stylistId ?? null, startsAt: new Date(t.startsAt).toISOString(), endsAt: new Date(t.endsAt).toISOString(), reason: t.reason ?? null }))
+  const open = hours && !hours.isClosed && hours.opensAt ? hours.opensAt : '08:00'
+  const close = hours && !hours.isClosed && hours.closesAt ? hours.closesAt : '20:00'
   const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
   const gridStart = Math.floor(toMin(open) / 60) * 60
   const gridEnd = Math.ceil(toMin(close) / 60) * 60
@@ -170,7 +172,7 @@ async function DayView({ date, stylists, canCreate }: { date: string; stylists: 
     <>
       <PageHeader
         title={formatIsoDate(date)}
-        description={`${live.length} appointment${live.length === 1 ? '' : 's'}${hours?.is_closed ? ' · salon closed' : ` · open ${open}–${close}`}`}
+        description={`${live.length} appointment${live.length === 1 ? '' : 's'}${hours?.isClosed ? ' · salon closed' : ` · open ${open}–${close}`}`}
         actions={
           <>
             <AdminButtonLink href={`/admin/appointments?view=day&date=${addDays(date, -1)}`} variant="outline"><ChevronLeft aria-hidden className="size-4" /> Previous</AdminButtonLink>
@@ -199,12 +201,12 @@ async function DayView({ date, stylists, canCreate }: { date: string; stylists: 
               {Array.from({ length: (gridEnd - gridStart) / 60 }, (_, i) => (
                 <div key={i} aria-hidden className="absolute inset-x-0 border-t border-charcoal/5" style={{ top: i * 60 * PX_PER_MIN }} />
               ))}
-              {(timeOff ?? [])
-                .filter((t) => t.stylist_id === s.id || t.stylist_id === null)
+              {timeOff
+                .filter((t) => t.stylistId === s.id || t.stylistId === null)
                 .map((t) => {
-                  // Clamp to this day (compare as instants: PostgREST and JS format ISO strings differently).
-                  const from = new Date(t.starts_at) < new Date(start) ? start : t.starts_at
-                  const to = new Date(t.ends_at) > new Date(end) ? end : t.ends_at
+                  // Clamp to this day (compare as instants, not as strings).
+                  const from = new Date(t.startsAt) < new Date(start) ? start : t.startsAt
+                  const to = new Date(t.endsAt) > new Date(end) ? end : t.endsAt
                   const height = Math.max(18, (new Date(to).getTime() - new Date(from).getTime()) / 60000 * PX_PER_MIN)
                   return (
                     <div key={t.id} className="absolute inset-x-1 rounded-sm bg-[repeating-linear-gradient(135deg,#efe7dc,#efe7dc_6px,#e6dacb_6px,#e6dacb_12px)] px-2 py-1 text-[0.6875rem] text-taupe-700" style={{ top: top(from), height: Math.min(height, (gridEnd - gridStart) * PX_PER_MIN) }}>

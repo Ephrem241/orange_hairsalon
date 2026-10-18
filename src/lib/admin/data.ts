@@ -1,11 +1,15 @@
 import 'server-only'
-import { createSessionClient } from '@/lib/supabase/server'
+import { api } from '@convex/_generated/api'
+import type { Id } from '@convex/_generated/dataModel'
+import type { FunctionReturnType } from 'convex/server'
+import { staffQuery } from '@/lib/convex/server'
+import { iso } from '@/lib/data/mappers'
 import type { AppointmentStatus } from '@/lib/types'
 
 /*
- * Dashboard reads. Every query runs with the signed-in staff member's session,
- * so row-level security decides what each role can see (a stylist only ever
- * receives their own appointments, whatever the filters say).
+ * Dashboard reads. Every call carries the signed-in staff member's token, so
+ * Convex decides what each role can see (a stylist only ever receives their
+ * own appointments, whatever the filters say).
  */
 
 export type AdminAppointment = {
@@ -35,40 +39,39 @@ export type AdminAppointment = {
   createdAt: string
 }
 
-const APPOINTMENT_COLUMNS =
-  'id, reference, status, source, starts_at, ends_at, service_id, service_name, stylist_id, customer_id, customer_name, customer_phone, customer_email, customer_notes, internal_notes, price_etb, price_type, duration_min, buffer_min, amount_paid_etb, cancel_reason, cancelled_by, created_at, stylist:stylists(display_name)'
+type AppointmentRow = FunctionReturnType<typeof api.appointments.list>[number]
 
-function mapAppointment(r: Record<string, unknown>): AdminAppointment {
-  const stylist = r.stylist as { display_name?: string } | null
+function mapAppointment(r: AppointmentRow): AdminAppointment {
   return {
-    id: String(r.id),
-    reference: String(r.reference),
-    status: r.status as AppointmentStatus,
-    source: String(r.source),
-    startsAt: String(r.starts_at),
-    endsAt: String(r.ends_at),
-    serviceId: String(r.service_id),
-    serviceName: String(r.service_name),
-    stylistId: String(r.stylist_id),
-    stylistName: stylist?.display_name ?? '—',
-    customerId: String(r.customer_id),
-    customerName: String(r.customer_name),
-    customerPhone: String(r.customer_phone),
-    customerEmail: (r.customer_email as string | null) ?? null,
-    customerNotes: (r.customer_notes as string | null) ?? null,
-    internalNotes: (r.internal_notes as string | null) ?? null,
-    priceEtb: Number(r.price_etb),
-    priceType: r.price_type === 'from' ? 'from' : 'fixed',
-    durationMin: Number(r.duration_min),
-    bufferMin: Number(r.buffer_min),
-    amountPaidEtb: r.amount_paid_etb === null ? null : Number(r.amount_paid_etb),
-    cancelReason: (r.cancel_reason as string | null) ?? null,
-    cancelledBy: (r.cancelled_by as string | null) ?? null,
-    createdAt: String(r.created_at),
+    id: r._id,
+    reference: r.reference,
+    status: r.status,
+    source: r.source,
+    startsAt: iso(r.startsAt),
+    endsAt: iso(r.endsAt),
+    serviceId: r.serviceId,
+    serviceName: r.serviceName,
+    stylistId: r.stylistId,
+    stylistName: r.stylistName,
+    customerId: r.customerId,
+    customerName: r.customerName,
+    customerPhone: r.customerPhone,
+    customerEmail: r.customerEmail ?? null,
+    customerNotes: r.customerNotes ?? null,
+    internalNotes: r.internalNotes ?? null,
+    priceEtb: r.priceEtb,
+    priceType: r.priceType,
+    durationMin: r.durationMin,
+    bufferMin: r.bufferMin,
+    amountPaidEtb: r.amountPaidEtb ?? null,
+    cancelReason: r.cancelReason ?? null,
+    cancelledBy: r.cancelledBy ?? null,
+    createdAt: iso(r._creationTime),
   }
 }
 
 export type AppointmentFilters = {
+  /** ISO instants */
   from?: string
   to?: string
   status?: AppointmentStatus | 'live'
@@ -80,46 +83,37 @@ export type AppointmentFilters = {
   ascending?: boolean
 }
 
-/** Characters with meaning in PostgREST filter syntax are stripped from search text. */
-const sanitize = (q: string) => q.replace(/[,()*%\\:"]/g, ' ').trim()
-
 export async function listAppointments(filters: AppointmentFilters = {}): Promise<AdminAppointment[]> {
-  const db = await createSessionClient()
-  let query = db.from('appointments').select(APPOINTMENT_COLUMNS)
-  if (filters.from) query = query.gte('starts_at', filters.from)
-  if (filters.to) query = query.lt('starts_at', filters.to)
-  if (filters.status === 'live') query = query.in('status', ['pending', 'confirmed'])
-  else if (filters.status) query = query.eq('status', filters.status)
-  if (filters.stylistId) query = query.eq('stylist_id', filters.stylistId)
-  if (filters.serviceId) query = query.eq('service_id', filters.serviceId)
-  if (filters.customerId) query = query.eq('customer_id', filters.customerId)
-  if (filters.q) {
-    const q = sanitize(filters.q)
-    if (/^OS-?[2-9A-HJKMNP-Z]{6}$/i.test(q)) {
-      query = query.eq('reference', q.toUpperCase().replace(/^OS(?!-)/, 'OS-'))
-    } else if (q) {
-      const digits = q.replace(/\D/g, '')
-      const clauses = [`customer_name.ilike.*${q}*`, ...(digits.length >= 4 ? [`customer_phone.ilike.*${digits.slice(-9)}*`] : [])]
-      query = query.or(clauses.join(','))
-    }
-  }
-  const { data, error } = await query.order('starts_at', { ascending: filters.ascending ?? true }).limit(filters.limit ?? 300)
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((r) => mapAppointment(r as Record<string, unknown>))
+  const rows = await staffQuery(api.appointments.list, {
+    from: filters.from ? Date.parse(filters.from) : undefined,
+    to: filters.to ? Date.parse(filters.to) : undefined,
+    status: filters.status,
+    stylistId: filters.stylistId as Id<'stylists'> | undefined,
+    serviceId: filters.serviceId as Id<'services'> | undefined,
+    customerId: filters.customerId as Id<'customers'> | undefined,
+    q: filters.q,
+    limit: filters.limit,
+    ascending: filters.ascending,
+  })
+  return rows.map(mapAppointment)
 }
 
 export async function getAppointment(id: string) {
-  const db = await createSessionClient()
-  const [{ data: appt }, { data: events }, { data: notifications }] = await Promise.all([
-    db.from('appointments').select(APPOINTMENT_COLUMNS).eq('id', id).maybeSingle(),
-    db.from('appointment_events').select('id, event, actor_type, details, created_at').eq('appointment_id', id).order('created_at'),
-    db.from('notification_log').select('id, event, channel, recipient, status, error, created_at, sent_at').eq('appointment_id', id).order('created_at'),
-  ])
-  if (!appt) return null
+  const detail = await staffQuery(api.appointments.get, { id: id as Id<'appointments'> })
+  if (!detail) return null
   return {
-    appointment: mapAppointment(appt as Record<string, unknown>),
-    events: (events ?? []) as { id: number; event: string; actor_type: string; details: Record<string, unknown>; created_at: string }[],
-    notifications: (notifications ?? []) as { id: string; event: string; channel: string; recipient: string; status: string; error: string | null; created_at: string; sent_at: string | null }[],
+    appointment: mapAppointment(detail.appointment),
+    events: detail.events.map((e) => ({ id: e._id, event: e.event, actorType: e.actorType, details: e.details, createdAt: iso(e._creationTime) })),
+    notifications: detail.notifications.map((n) => ({
+      id: n._id,
+      event: n.event,
+      channel: n.channel,
+      recipient: n.recipient,
+      status: n.status,
+      error: n.error ?? null,
+      createdAt: iso(n._creationTime),
+      sentAt: n.sentAt ? iso(n.sentAt) : null,
+    })),
   }
 }
 
@@ -129,7 +123,9 @@ export type AdminStylist = {
   displayName: string
   title: string | null
   bio: string | null
+  /** Stored reference (for forms) and its displayable URL. */
   photoPath: string | null
+  photoUrl: string | null
   isActive: boolean
   acceptsOnlineBooking: boolean
   sortOrder: number
@@ -138,24 +134,20 @@ export type AdminStylist = {
 }
 
 export async function listStylists(): Promise<AdminStylist[]> {
-  const db = await createSessionClient()
-  const { data } = await db
-    .from('stylists')
-    .select('id, slug, display_name, title, bio, photo_path, is_active, accepts_online_booking, sort_order, is_demo, stylist_services(service_id)')
-    .order('sort_order')
-    .order('display_name')
-  return (data ?? []).map((r) => ({
-    id: r.id,
+  const rows = await staffQuery(api.stylists.list, {})
+  return rows.map((r) => ({
+    id: r._id,
     slug: r.slug,
-    displayName: r.display_name,
-    title: r.title,
-    bio: r.bio,
-    photoPath: r.photo_path,
-    isActive: r.is_active,
-    acceptsOnlineBooking: r.accepts_online_booking,
-    sortOrder: r.sort_order,
-    isDemo: r.is_demo,
-    serviceIds: ((r.stylist_services as { service_id: string }[] | null) ?? []).map((s) => s.service_id),
+    displayName: r.displayName,
+    title: r.title ?? null,
+    bio: r.bio ?? null,
+    photoPath: r.photoPath ?? null,
+    photoUrl: r.photoUrl ?? null,
+    isActive: r.isActive,
+    acceptsOnlineBooking: r.acceptsOnlineBooking,
+    sortOrder: r.sortOrder,
+    isDemo: r.isDemo,
+    serviceIds: r.serviceIds,
   }))
 }
 
@@ -165,7 +157,9 @@ export type AdminService = {
   name: string
   summary: string | null
   description: string | null
+  /** Stored reference (for forms) and its displayable URL. */
   imagePath: string | null
+  imageUrl: string | null
   priceEtb: number
   priceType: 'fixed' | 'from'
   durationMin: number
@@ -179,50 +173,42 @@ export type AdminService = {
 }
 
 export async function listServices(): Promise<AdminService[]> {
-  const db = await createSessionClient()
-  const { data } = await db
-    .from('services')
-    .select('id, slug, name, summary, description, image_path, price_etb, price_type, duration_min, buffer_min, is_active, is_featured, sort_order, is_demo, category_id, category:service_categories(name)')
-    .order('sort_order')
-    .order('name')
-  return (data ?? []).map((r) => ({
-    id: r.id,
+  const rows = await staffQuery(api.catalog.listServices, {})
+  return rows.map((r) => ({
+    id: r._id,
     slug: r.slug,
     name: r.name,
-    summary: r.summary,
-    description: r.description,
-    imagePath: r.image_path,
-    priceEtb: r.price_etb,
-    priceType: r.price_type,
-    durationMin: r.duration_min,
-    bufferMin: r.buffer_min,
-    isActive: r.is_active,
-    isFeatured: r.is_featured,
-    sortOrder: r.sort_order,
-    isDemo: r.is_demo,
-    categoryId: r.category_id,
-    categoryName: (r.category as { name?: string } | null)?.name ?? null,
+    summary: r.summary ?? null,
+    description: r.description ?? null,
+    imagePath: r.imagePath ?? null,
+    imageUrl: r.imageUrl ?? null,
+    priceEtb: r.priceEtb,
+    priceType: r.priceType,
+    durationMin: r.durationMin,
+    bufferMin: r.bufferMin ?? null,
+    isActive: r.isActive,
+    isFeatured: r.isFeatured,
+    sortOrder: r.sortOrder,
+    isDemo: r.isDemo,
+    categoryId: r.categoryId ?? null,
+    categoryName: r.categoryName,
   }))
 }
 
 export async function listCategories() {
-  const db = await createSessionClient()
-  const { data } = await db.from('service_categories').select('id, slug, name, description, sort_order').order('sort_order').order('name')
-  return (data ?? []) as { id: string; slug: string; name: string; description: string | null; sort_order: number }[]
+  const rows = await staffQuery(api.catalog.listCategories, {})
+  return rows.map((c) => ({ id: c._id, slug: c.slug, name: c.name, description: c.description ?? null, sortOrder: c.sortOrder }))
 }
 
 export async function dashboardSummary(from: string, to: string) {
-  const db = await createSessionClient()
-  const { data, error } = await db.rpc('dashboard_summary', { p_from: from, p_to: to })
-  if (error) throw new Error(error.message)
-  return data as {
-    total: number
-    pending: number
-    confirmed: number
-    completed: number
-    cancelled: number
-    no_show: number
-    recorded_revenue_etb: number
-    expected_revenue_etb: number
-  }
+  return await staffQuery(api.appointments.summary, { from: Date.parse(from), to: Date.parse(to) })
+}
+
+/** Upcoming time off (ends after now), mapped for display. */
+export async function upcomingTimeOff(scope?: string | 'salon') {
+  const rows = await staffQuery(api.stylists.upcomingTimeOff, {
+    from: Date.now(),
+    scope: scope as Id<'stylists'> | 'salon' | undefined,
+  })
+  return rows.map((t) => ({ id: t._id, stylistId: t.stylistId ?? null, startsAt: iso(t.startsAt), endsAt: iso(t.endsAt), reason: t.reason ?? null }))
 }

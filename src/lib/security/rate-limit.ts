@@ -1,6 +1,7 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
-import { createAdminClient, isServerDataConfigured } from '@/lib/supabase/admin'
+import { api } from '@convex/_generated/api'
+import { isServerDataConfigured, serverMutation } from '@/lib/convex/server'
 
 /** Best-effort client IP behind Vercel's proxy (the first X-Forwarded-For hop). */
 export function clientIp(headers: Headers): string {
@@ -14,21 +15,17 @@ export function rateLimitKey(scope: string, identifier: string): string {
 }
 
 /**
- * Fixed-window limit stored in Postgres (works across serverless instances).
+ * Fixed-window limit stored in Convex (works across serverless instances).
  * Returns true when the request may proceed. Fails open if the limiter itself
  * errors, so an infrastructure hiccup never blocks genuine bookings — the
- * database constraints still protect integrity.
+ * booking engine still protects integrity.
  */
 export async function allowRequest(scope: string, identifier: string, limit: number, windowSeconds: number): Promise<boolean> {
   if (!isServerDataConfigured) return true
-  const { data, error } = await createAdminClient().rpc('consume_rate_limit', {
-    p_key: rateLimitKey(scope, identifier),
-    p_limit: limit,
-    p_window_seconds: windowSeconds,
-  })
-  if (error) {
-    console.error('[rate-limit] limiter unavailable, allowing request', error.message)
+  try {
+    return await serverMutation(api.rateLimit.consume, { key: rateLimitKey(scope, identifier), limit, windowSeconds })
+  } catch (error) {
+    console.error('[rate-limit] limiter unavailable, allowing request', (error as Error).message)
     return true
   }
-  return data === true
 }

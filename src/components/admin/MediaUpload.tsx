@@ -3,8 +3,7 @@
 import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { ImagePlus, Loader2, Trash2 } from 'lucide-react'
-import { mediaUrl, MEDIA_BUCKET } from '@/lib/media-url'
-import { getBrowserClient } from '@/lib/supabase/browser'
+import { createUploadUrl, finalizeUpload } from './media-actions'
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
 const VIDEO_TYPES = ['video/mp4', 'video/webm']
@@ -22,22 +21,23 @@ async function toWebp(file: File, maxSide = 2000): Promise<Blob> {
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not process image'))), 'image/webp', 0.85))
 }
 
-export type UploadedMedia = { path: string; width?: number; height?: number }
+/** `path` is what gets saved; `url` is for display. */
+export type UploadedMedia = { path: string; url: string; width?: number; height?: number }
 
 /**
- * Upload to Supabase Storage with the signed-in admin's session (storage
- * policies allow admins only). Type and size are checked here and again by
- * the bucket's own limits.
+ * Upload to Convex file storage (admins only). Type and size are checked here
+ * and again by Convex when the upload is finalized.
  */
 export function MediaUpload({
-  folder,
   value,
+  previewUrl,
   onChange,
   accept = 'image',
   label = 'Image',
 }: {
-  folder: 'services' | 'stylists' | 'gallery'
+  /** The stored reference, and its displayable URL for the preview. */
   value: string | null
+  previewUrl: string | null
   onChange: (media: UploadedMedia | null) => void
   accept?: 'image' | 'video'
   label?: string
@@ -60,20 +60,24 @@ export function MediaUpload({
     setBusy(true)
     try {
       let body: Blob = file
-      let ext = file.type === 'video/webm' ? 'webm' : 'mp4'
       let dims: { width?: number; height?: number } = {}
       if (accept === 'image') {
         body = await toWebp(file)
-        ext = 'webp'
         const bitmap = await createImageBitmap(body)
         dims = { width: bitmap.width, height: bitmap.height }
       }
-      const path = `${folder}/${crypto.randomUUID()}.${ext}`
-      const { error: uploadError } = await getBrowserClient()
-        .storage.from(MEDIA_BUCKET)
-        .upload(path, body, { contentType: accept === 'image' ? 'image/webp' : file.type, cacheControl: '31536000', upsert: false })
-      if (uploadError) throw uploadError
-      onChange({ path, ...dims })
+      const target = await createUploadUrl()
+      if (!target.ok) throw new Error(target.error)
+      const response = await fetch(target.data!.url, {
+        method: 'POST',
+        headers: { 'Content-Type': accept === 'image' ? 'image/webp' : file.type },
+        body,
+      })
+      if (!response.ok) throw new Error('Upload failed.')
+      const { storageId } = (await response.json()) as { storageId: string }
+      const stored = await finalizeUpload(storageId, accept)
+      if (!stored.ok) throw new Error(stored.error)
+      onChange({ ...stored.data!, ...dims })
     } catch (e) {
       setError((e as Error).message || 'Upload failed.')
     } finally {
@@ -87,8 +91,8 @@ export function MediaUpload({
       <p className="mb-1.5 text-sm font-medium">{label}</p>
       <div className="flex items-center gap-4">
         <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-charcoal/15 bg-ivory-200">
-          {value && accept === 'image' ? (
-            <Image src={mediaUrl(value)} alt="" fill sizes="96px" className="object-cover" />
+          {value && previewUrl && accept === 'image' ? (
+            <Image src={previewUrl} alt="" fill sizes="96px" className="object-cover" />
           ) : value ? (
             <span className="px-2 text-center text-[0.6875rem] text-taupe-700">Video uploaded</span>
           ) : (

@@ -2,7 +2,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Clock } from 'lucide-react'
 import { formatDuration, formatEtb } from '@/lib/format'
-import { mediaUrl } from '@/lib/media-url'
 import type { Service } from '@/lib/types'
 import { DemoBadge } from './DemoBadge'
 
@@ -12,7 +11,7 @@ export function ServiceCard({ service, sizes = '(min-width: 1280px) 22vw, (min-w
       <div className="relative aspect-[4/3] overflow-hidden bg-ivory-300">
         {service.imagePath ? (
           <Image
-            src={mediaUrl(service.imagePath)}
+            src={service.imagePath}
             alt=""
             fill
             sizes={sizes}

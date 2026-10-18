@@ -1,18 +1,21 @@
 'use server'
 
+import { api } from '@convex/_generated/api'
+import type { Id } from '@convex/_generated/dataModel'
 import { refresh, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { ADMIN_ONLY, authorize, type ActionResult } from '@/lib/auth/staff'
-import { toAppError } from '@/lib/booking/errors'
+import { errorCode, toAppError } from '@/lib/booking/errors'
+import { staffMutation } from '@/lib/convex/server'
 import { TAGS } from '@/lib/data/tags'
 import { MEDIA_PATH_PATTERN, slugify } from '@/lib/slug'
-import { createSessionClient } from '@/lib/supabase/server'
+import { convexId } from '@/lib/validation'
 
 const serviceInput = z.object({
-  id: z.uuid().nullable(),
+  id: convexId().nullable(),
   name: z.string().trim().min(1, 'Enter a name.').max(120),
   slug: z.string().trim().max(80).optional(),
-  categoryId: z.uuid().nullable(),
+  categoryId: convexId().nullable(),
   summary: z.string().trim().max(200),
   description: z.string().trim().max(4000),
   imagePath: z.string().regex(MEDIA_PATH_PATTERN, 'Invalid image.').nullable(),
@@ -36,41 +39,29 @@ export async function saveService(values: z.input<typeof serviceInput>): Promise
   const v = parsed.data
   const slug = slugify(v.slug || v.name)
   if (!slug) return { ok: false, error: 'Enter a name using letters or numbers.', fields: { name: 'Enter a name using letters or numbers.' } }
-  const row = {
-    name: v.name,
-    slug,
-    category_id: v.categoryId,
-    summary: v.summary || null,
-    description: v.description || null,
-    image_path: v.imagePath,
-    price_etb: v.priceEtb,
-    price_type: v.priceType,
-    duration_min: v.durationMin,
-    buffer_min: v.bufferMin,
-    is_active: v.isActive,
-    is_featured: v.isFeatured,
-    sort_order: v.sortOrder,
-  }
-  const db = await createSessionClient()
-  const result = v.id
-    ? await db.from('services').update(row).eq('id', v.id).select('id').single()
-    : await db.from('services').insert(row).select('id').single()
-  if (result.error) {
-    if (result.error.code === '23505') return { ok: false, error: 'Another service already uses this web address (slug).', fields: { slug: 'Already in use.' } }
-    return { ok: false, error: toAppError(result.error).message }
+  let id: string
+  try {
+    id = await staffMutation(api.catalog.saveService, {
+      ...v,
+      slug,
+      id: v.id as Id<'services'> | null,
+      categoryId: v.categoryId as Id<'serviceCategories'> | null,
+    })
+  } catch (error) {
+    if (errorCode(error) === 'SLUG_TAKEN') return { ok: false, error: 'Another service already uses this web address (slug).', fields: { slug: 'Already in use.' } }
+    return { ok: false, error: toAppError(error).message }
   }
   updateTag(TAGS.catalog)
   refresh()
-  return { ok: true, message: 'Service saved.', data: { id: result.data.id } }
+  return { ok: true, message: 'Service saved.', data: { id } }
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {
   const auth = await authorize(ADMIN_ONLY)
   if ('error' in auth) return auth.error
-  const db = await createSessionClient()
-  const { error } = await db.from('services').delete().eq('id', id)
-  if (error) {
-    if (error.code === '23503') return { ok: false, error: 'This service has bookings, so it can’t be deleted. Switch it off (inactive) instead.' }
+  try {
+    await staffMutation(api.catalog.deleteService, { id: id as Id<'services'> })
+  } catch (error) {
     return { ok: false, error: toAppError(error).message }
   }
   updateTag(TAGS.catalog)
@@ -79,7 +70,7 @@ export async function deleteService(id: string): Promise<ActionResult> {
 }
 
 const categoryInput = z.object({
-  id: z.uuid().nullable(),
+  id: convexId().nullable(),
   name: z.string().trim().min(1, 'Enter a name.').max(80),
   description: z.string().trim().max(500),
   sortOrder: z.number().int().min(0).max(10_000),
@@ -91,10 +82,11 @@ export async function saveCategory(values: z.input<typeof categoryInput>): Promi
   const parsed = categoryInput.safeParse(values)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
   const v = parsed.data
-  const row = { name: v.name, slug: slugify(v.name), description: v.description || null, sort_order: v.sortOrder }
-  const db = await createSessionClient()
-  const { error } = v.id ? await db.from('service_categories').update(row).eq('id', v.id) : await db.from('service_categories').insert(row)
-  if (error) return { ok: false, error: error.code === '23505' ? 'A category with this name already exists.' : toAppError(error).message }
+  try {
+    await staffMutation(api.catalog.saveCategory, { ...v, id: v.id as Id<'serviceCategories'> | null, slug: slugify(v.name) })
+  } catch (error) {
+    return { ok: false, error: errorCode(error) === 'SLUG_TAKEN' ? 'A category with this name already exists.' : toAppError(error).message }
+  }
   updateTag(TAGS.catalog)
   refresh()
   return { ok: true, message: 'Category saved.' }
@@ -103,9 +95,11 @@ export async function saveCategory(values: z.input<typeof categoryInput>): Promi
 export async function deleteCategory(id: string): Promise<ActionResult> {
   const auth = await authorize(ADMIN_ONLY)
   if ('error' in auth) return auth.error
-  const db = await createSessionClient()
-  const { error } = await db.from('service_categories').delete().eq('id', id)
-  if (error) return { ok: false, error: toAppError(error).message }
+  try {
+    await staffMutation(api.catalog.deleteCategory, { id: id as Id<'serviceCategories'> })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.catalog)
   refresh()
   return { ok: true, message: 'Category removed. Its services are now uncategorised.' }

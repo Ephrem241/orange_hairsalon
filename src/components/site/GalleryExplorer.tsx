@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { ChevronLeft, ChevronRight, Play, X } from 'lucide-react'
 import { galleryCategoryLabel } from '@/lib/gallery'
-import { mediaUrl } from '@/lib/media-url'
 import type { GalleryItem } from '@/lib/types'
 import { BeforeAfter } from './BeforeAfter'
 import { FilterChip } from './ServicesExplorer'
@@ -51,7 +50,7 @@ export function GalleryExplorer({ items }: { items: GalleryItem[] }) {
               aria-label={`Open ${item.caption ?? item.altText}`}
             >
               <Image
-                src={mediaUrl(item.mediaType === 'video' ? item.posterPath! : item.mediaPath)}
+                src={(item.mediaType === 'video' ? item.posterPath! : item.mediaPath)}
                 alt={item.altText}
                 width={item.width ?? 1000}
                 height={item.height ?? 1250}
@@ -192,8 +191,8 @@ function Lightbox({ items, index, onChange }: { items: GalleryItem[]; index: num
                   {item.mediaType === 'video' ? (
                     <video
                       key={item.mediaPath}
-                      src={mediaUrl(item.mediaPath)}
-                      poster={item.posterPath ? mediaUrl(item.posterPath) : undefined}
+                      src={item.mediaPath}
+                      poster={item.posterPath ? item.posterPath : undefined}
                       controls
                       autoPlay
                       muted
@@ -204,11 +203,11 @@ function Lightbox({ items, index, onChange }: { items: GalleryItem[]; index: num
                     />
                   ) : item.beforePath ? (
                     <div className="w-full max-w-md">
-                      <BeforeAfter before={mediaUrl(item.beforePath)} after={mediaUrl(item.mediaPath)} alt={item.altText} />
+                      <BeforeAfter before={item.beforePath} after={item.mediaPath} alt={item.altText} />
                     </div>
                   ) : (
                     <Image
-                      src={mediaUrl(item.mediaPath)}
+                      src={item.mediaPath}
                       alt={item.altText}
                       fill
                       sizes="100vw"

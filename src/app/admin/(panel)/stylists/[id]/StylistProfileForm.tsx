@@ -23,6 +23,7 @@ export function StylistProfileForm({ stylist, contact, nextSortOrder }: { stylis
     phone: contact?.phone ?? '',
     email: contact?.email ?? '',
   })
+  const [photoUrl, setPhotoUrl] = useState(stylist?.photoUrl ?? null)
   const set = (p: Partial<typeof v>) => setV((x) => ({ ...x, ...p }))
 
   return (
@@ -39,7 +40,15 @@ export function StylistProfileForm({ stylist, contact, nextSortOrder }: { stylis
         })
       }}
     >
-      <MediaUpload folder="stylists" label="Portrait" value={v.photoPath} onChange={(m) => set({ photoPath: m?.path ?? null })} />
+      <MediaUpload
+        label="Portrait"
+        value={v.photoPath}
+        previewUrl={photoUrl}
+        onChange={(m) => {
+          set({ photoPath: m?.path ?? null })
+          setPhotoUrl(m?.url ?? null)
+        }}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Display name">{({ id }) => <TextInput id={id} value={v.displayName} onChange={(e) => set({ displayName: e.target.value })} />}</Field>
         <Field label="Title" optional hint="e.g. Braids specialist">{({ id, describedBy }) => <TextInput id={id} value={v.title} aria-describedby={describedBy} onChange={(e) => set({ title: e.target.value })} />}</Field>

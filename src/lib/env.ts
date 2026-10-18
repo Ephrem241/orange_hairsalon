@@ -1,12 +1,11 @@
 /**
  * Environment flags. Only NEXT_PUBLIC_* values are safe in client code; the
- * secret key is read exclusively in server-only modules.
+ * Convex server secret is read exclusively in server-only modules.
  */
-export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-export const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? ''
+export const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? ''
 
-/** True when the public Supabase connection is configured. */
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey)
+/** True when a Convex deployment is configured. */
+export const isConvexConfigured = Boolean(convexUrl)
 
 /**
  * When the database is not configured, show clearly labelled demo services and

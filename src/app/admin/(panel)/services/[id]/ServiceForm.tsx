@@ -14,6 +14,7 @@ export function ServiceForm({ service, categories, nextSortOrder }: { service: A
   const router = useRouter()
   const [pending, start] = useTransition()
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [imageUrl, setImageUrl] = useState(service?.imageUrl ?? null)
   const [v, setV] = useState({
     name: service?.name ?? '',
     slug: service?.slug ?? '',
@@ -105,7 +106,14 @@ export function ServiceForm({ service, categories, nextSortOrder }: { service: A
       </section>
 
       <aside className="space-y-5 rounded-md border border-charcoal/10 bg-white p-5">
-        <MediaUpload folder="services" value={v.imagePath} onChange={(m) => set({ imagePath: m?.path ?? null })} />
+        <MediaUpload
+          value={v.imagePath}
+          previewUrl={imageUrl}
+          onChange={(m) => {
+            set({ imagePath: m?.path ?? null })
+            setImageUrl(m?.url ?? null)
+          }}
+        />
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={v.isActive} onChange={(e) => set({ isActive: e.target.checked })} className="mt-0.5 size-4 accent-[#171513]" />
           <span><strong className="font-medium">Bookable</strong><span className="block text-xs text-taupe-700">Visible on the site and in online booking.</span></span>

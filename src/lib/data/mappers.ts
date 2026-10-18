@@ -1,4 +1,11 @@
-/** Database rows (snake_case) → domain objects (camelCase). */
+/**
+ * Convex documents (epoch-ms instants, absent optionals) → domain objects (ISO
+ * strings, nulls). Public media fields carry the displayable URL Convex resolved
+ * (a site path such as "/images/…", or a file-storage URL).
+ */
+import type { api } from '@convex/_generated/api'
+import type { Doc } from '@convex/_generated/dataModel'
+import type { FunctionReturnType } from 'convex/server'
 import type {
   BusinessHours,
   BusinessSettings,
@@ -11,38 +18,35 @@ import type {
   Stylist,
 } from '@/lib/types'
 
-type Row = Record<string, unknown>
+export const iso = (ms: number) => new Date(ms).toISOString()
+const orNull = <T>(v: T | undefined): T | null => (v === undefined || v === '' ? null : v)
 
-const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null)
-const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v))
-const hhmm = (v: unknown) => (typeof v === 'string' ? v.slice(0, 5) : null)
-
-export function mapSettings(r: Row): BusinessSettings {
+export function mapSettings(r: Doc<'businessSettings'>): BusinessSettings {
   return {
-    name: String(r.name),
-    tagline: str(r.tagline),
-    phone: str(r.phone),
-    whatsapp: str(r.whatsapp),
-    email: str(r.email),
-    addressLine: str(r.address_line),
-    city: String(r.city ?? 'Addis Ababa'),
-    countryCode: String(r.country_code ?? 'ET'),
-    mapUrl: str(r.map_url),
-    latitude: num(r.latitude),
-    longitude: num(r.longitude),
+    name: r.name,
+    tagline: orNull(r.tagline),
+    phone: orNull(r.phone),
+    whatsapp: orNull(r.whatsapp),
+    email: orNull(r.email),
+    addressLine: orNull(r.addressLine),
+    city: r.city,
+    countryCode: r.countryCode,
+    mapUrl: orNull(r.mapUrl),
+    latitude: orNull(r.latitude),
+    longitude: orNull(r.longitude),
     socials: cleanSocials(r.socials),
-    aboutStory: str(r.about_story),
-    policyText: str(r.policy_text),
-    onlineBookingEnabled: Boolean(r.online_booking_enabled),
-    minLeadMinutes: Number(r.min_lead_minutes),
-    maxAdvanceDays: Number(r.max_advance_days),
-    slotIntervalMin: Number(r.slot_interval_min),
-    defaultBufferMin: Number(r.default_buffer_min),
-    cancelCutoffHours: Number(r.cancel_cutoff_hours),
-    allowCustomerCancel: Boolean(r.allow_customer_cancel),
-    allowCustomerReschedule: Boolean(r.allow_customer_reschedule),
-    autoConfirm: Boolean(r.auto_confirm),
-    requireEmail: Boolean(r.require_email),
+    aboutStory: orNull(r.aboutStory),
+    policyText: orNull(r.policyText),
+    onlineBookingEnabled: r.onlineBookingEnabled,
+    minLeadMinutes: r.minLeadMinutes,
+    maxAdvanceDays: r.maxAdvanceDays,
+    slotIntervalMin: r.slotIntervalMin,
+    defaultBufferMin: r.defaultBufferMin,
+    cancelCutoffHours: r.cancelCutoffHours,
+    allowCustomerCancel: r.allowCustomerCancel,
+    allowCustomerReschedule: r.allowCustomerReschedule,
+    autoConfirm: r.autoConfirm,
+    requireEmail: r.requireEmail,
   }
 }
 
@@ -59,98 +63,98 @@ export function cleanSocials(value: unknown): Socials {
   return out
 }
 
-export function mapHours(r: Row): BusinessHours {
-  return { weekday: Number(r.weekday), isClosed: Boolean(r.is_closed), opensAt: hhmm(r.opens_at), closesAt: hhmm(r.closes_at) }
+export function mapHours(r: Doc<'businessHours'>): BusinessHours {
+  return { weekday: r.weekday, isClosed: r.isClosed, opensAt: orNull(r.opensAt), closesAt: orNull(r.closesAt) }
 }
 
-export function mapCategory(r: Row): ServiceCategory {
-  return { id: String(r.id), slug: String(r.slug), name: String(r.name), description: str(r.description), sortOrder: Number(r.sort_order ?? 0) }
+export function mapCategory(r: Doc<'serviceCategories'>): ServiceCategory {
+  return { id: r._id, slug: r.slug, name: r.name, description: orNull(r.description), sortOrder: r.sortOrder }
 }
 
-export function mapService(r: Row): Service {
-  const category = r.category as Row | null | undefined
+export function mapService(r: FunctionReturnType<typeof api.public.services>[number]): Service {
   return {
-    id: String(r.id),
-    slug: String(r.slug),
-    name: String(r.name),
-    summary: str(r.summary),
-    description: str(r.description),
-    imagePath: str(r.image_path),
-    priceEtb: Number(r.price_etb),
-    priceType: r.price_type === 'from' ? 'from' : 'fixed',
-    durationMin: Number(r.duration_min),
-    bufferMin: num(r.buffer_min),
-    isActive: Boolean(r.is_active),
-    isFeatured: Boolean(r.is_featured),
-    sortOrder: Number(r.sort_order ?? 0),
-    isDemo: Boolean(r.is_demo),
-    category: category ? { id: String(category.id), slug: String(category.slug), name: String(category.name) } : null,
+    id: r._id,
+    slug: r.slug,
+    name: r.name,
+    summary: orNull(r.summary),
+    description: orNull(r.description),
+    imagePath: orNull(r.imageUrl),
+    priceEtb: r.priceEtb,
+    priceType: r.priceType,
+    durationMin: r.durationMin,
+    bufferMin: orNull(r.bufferMin),
+    isActive: r.isActive,
+    isFeatured: r.isFeatured,
+    sortOrder: r.sortOrder,
+    isDemo: r.isDemo,
+    category: r.category ? { id: r.category._id, slug: r.category.slug, name: r.category.name } : null,
   }
 }
 
-export function mapStylist(r: Row): Stylist {
-  const links = (r.stylist_services as Row[] | undefined) ?? []
+export function mapStylist(r: Doc<'stylists'> & { photoUrl?: string; serviceIds: string[] }): Stylist {
   return {
-    id: String(r.id),
-    slug: String(r.slug),
-    displayName: String(r.display_name),
-    title: str(r.title),
-    bio: str(r.bio),
-    photoPath: str(r.photo_path),
-    isActive: Boolean(r.is_active),
-    acceptsOnlineBooking: Boolean(r.accepts_online_booking),
-    sortOrder: Number(r.sort_order ?? 0),
-    isDemo: Boolean(r.is_demo),
-    serviceIds: links.map((l) => String(l.service_id)),
+    id: r._id,
+    slug: r.slug,
+    displayName: r.displayName,
+    title: orNull(r.title),
+    bio: orNull(r.bio),
+    photoPath: orNull(r.photoUrl),
+    isActive: r.isActive,
+    acceptsOnlineBooking: r.acceptsOnlineBooking,
+    sortOrder: r.sortOrder,
+    isDemo: r.isDemo,
+    serviceIds: r.serviceIds,
   }
 }
 
-export function mapGalleryItem(r: Row): GalleryItem {
+type GalleryRow = FunctionReturnType<typeof api.public.gallery>[number]
+
+export function mapGalleryItem(r: GalleryRow): GalleryItem {
   return {
-    id: String(r.id),
-    mediaType: r.media_type === 'video' ? 'video' : 'image',
-    mediaPath: String(r.media_path),
-    posterPath: str(r.poster_path),
-    beforePath: str(r.before_path),
-    caption: str(r.caption),
-    altText: String(r.alt_text),
-    category: String(r.category),
-    source: r.source === 'illustrative' ? 'illustrative' : 'salon',
-    width: num(r.width),
-    height: num(r.height),
-    isFeatured: Boolean(r.is_featured),
-    isPublished: Boolean(r.is_published),
-    sortOrder: Number(r.sort_order ?? 0),
+    id: r._id,
+    mediaType: r.mediaType,
+    mediaPath: r.mediaUrl ?? r.mediaPath,
+    posterPath: orNull(r.posterUrl),
+    beforePath: orNull(r.beforeUrl),
+    caption: orNull(r.caption),
+    altText: r.altText,
+    category: r.category,
+    source: r.source,
+    width: orNull(r.width),
+    height: orNull(r.height),
+    isFeatured: r.isFeatured,
+    isPublished: r.isPublished,
+    sortOrder: r.sortOrder,
   }
 }
 
-export function mapReview(r: Row): Review {
+export function mapReview(r: Doc<'reviews'>): Review {
   return {
-    id: String(r.id),
-    authorName: String(r.author_name),
-    rating: num(r.rating),
-    body: String(r.body),
-    source: r.source as Review['source'],
-    sourceUrl: str(r.source_url),
-    reviewedOn: str(r.reviewed_on),
+    id: r._id,
+    authorName: r.authorName,
+    rating: orNull(r.rating),
+    body: r.body,
+    source: r.source,
+    sourceUrl: orNull(r.sourceUrl),
+    reviewedOn: orNull(r.reviewedOn),
   }
 }
 
-export function mapCustomerBooking(r: Row): CustomerBooking {
+export function mapCustomerBooking(r: FunctionReturnType<typeof api.booking.cancel>['booking']): CustomerBooking {
   return {
-    reference: String(r.reference),
-    status: r.status as CustomerBooking['status'],
-    serviceId: String(r.service_id),
-    serviceName: String(r.service_name),
-    stylistName: str(r.stylist_name),
-    startsAt: String(r.starts_at),
-    endsAt: String(r.ends_at),
-    durationMin: Number(r.duration_min),
-    priceEtb: Number(r.price_etb),
-    priceType: r.price_type === 'from' ? 'from' : 'fixed',
-    customerName: String(r.customer_name),
-    canCancel: Boolean(r.can_cancel),
-    canReschedule: Boolean(r.can_reschedule),
-    changeDeadline: String(r.change_deadline),
+    reference: r.reference,
+    status: r.status,
+    serviceId: r.serviceId,
+    serviceName: r.serviceName,
+    stylistName: r.stylistName,
+    startsAt: iso(r.startsAt),
+    endsAt: iso(r.endsAt),
+    durationMin: r.durationMin,
+    priceEtb: r.priceEtb,
+    priceType: r.priceType,
+    customerName: r.customerName,
+    canCancel: r.canCancel,
+    canReschedule: r.canReschedule,
+    changeDeadline: iso(r.changeDeadline),
   }
 }

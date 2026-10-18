@@ -6,7 +6,6 @@ import { DemoBadge } from '@/components/site/DemoBadge'
 import { listServices, listStylists } from '@/lib/admin/data'
 import { ADMIN_ONLY, requirePageStaff } from '@/lib/auth/staff'
 import { initials } from '@/lib/format'
-import { mediaUrl } from '@/lib/media-url'
 
 export const metadata: Metadata = { title: 'Stylists' }
 
@@ -27,7 +26,7 @@ export default async function StylistsPage() {
             <li key={s.id}>
               <Link href={`/admin/stylists/${s.id}`} className="flex gap-4 rounded-md border border-charcoal/10 bg-white p-4 transition-colors hover:border-gold-600">
                 <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-charcoal font-serif text-lg text-gold">
-                  {s.photoPath ? <Image src={mediaUrl(s.photoPath)} alt="" fill sizes="64px" className="object-cover" /> : initials(s.displayName)}
+                  {s.photoUrl ? <Image src={s.photoUrl} alt="" fill sizes="64px" className="object-cover" /> : initials(s.displayName)}
                 </span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-2 font-medium">{s.displayName} {s.isDemo && <DemoBadge />}</span>

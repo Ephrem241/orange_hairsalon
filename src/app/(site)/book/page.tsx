@@ -5,7 +5,7 @@ import { BookingWizard } from '@/components/booking/BookingWizard'
 import { PageHero } from '@/components/site/PageHero'
 import { ButtonAnchor, ButtonLink } from '@/components/ui/Button'
 import { getServices, getSettings, getStylists } from '@/lib/data/public'
-import { isDemoContentEnabled, isSupabaseConfigured } from '@/lib/env'
+import { isConvexConfigured, isDemoContentEnabled } from '@/lib/env'
 import { formatPhone, telHref } from '@/lib/format'
 import { pageMetadata } from '@/lib/seo'
 
@@ -17,7 +17,7 @@ export const metadata: Metadata = pageMetadata({
 
 export default async function BookPage() {
   const [settings, services, stylists] = await Promise.all([getSettings(), getServices(), getStylists()])
-  const demoPreview = !isSupabaseConfigured && isDemoContentEnabled
+  const demoPreview = !isConvexConfigured && isDemoContentEnabled
   const open = (settings.onlineBookingEnabled || demoPreview) && services.length > 0
 
   return (
@@ -37,7 +37,7 @@ export default async function BookPage() {
               <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-gold-700" />
               <span>
                 <strong className="text-charcoal">Demo preview.</strong> The services and stylists below are sample data and no
-                database is connected, so times cannot actually be booked. See docs/SETUP.md to connect Supabase.
+                database is connected, so times cannot actually be booked. See docs/SETUP.md to connect Convex.
               </span>
             </p>
           )}

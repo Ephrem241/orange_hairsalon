@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import { AdminNav } from '@/components/admin/AdminNav'
 import { requirePageStaff } from '@/lib/auth/staff'
-import { signOut } from '../login/actions'
 
 // The dashboard is per-user and always rendered at request time.
 export const instant = false
@@ -18,7 +17,7 @@ async function Frame({ children }: { children: React.ReactNode }) {
   const staff = await requirePageStaff()
   return (
     <>
-      <AdminNav role={staff!.role} name={staff!.fullName} signOut={signOut} />
+      <AdminNav role={staff!.role} name={staff!.fullName} />
       <main id="main" className="lg:pl-60">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">{children}</div>
       </main>

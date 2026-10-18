@@ -1,12 +1,15 @@
 import type { NextConfig } from 'next'
 
-const supabaseHost = (() => {
+// Uploaded media is served from the Convex deployment's storage endpoint.
+const convexUrl = (() => {
   try {
-    return process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : null
+    return process.env.NEXT_PUBLIC_CONVEX_URL ? new URL(process.env.NEXT_PUBLIC_CONVEX_URL) : null
   } catch {
     return null
   }
 })()
+// A local Convex backend (npx convex dev) listens on 127.0.0.1; never true for a cloud deployment.
+const convexIsLocal = convexUrl !== null && ['127.0.0.1', 'localhost'].includes(convexUrl.hostname)
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -33,9 +36,17 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     qualities: [60, 75, 85],
-    remotePatterns: supabaseHost
-      ? [{ protocol: 'https', hostname: supabaseHost, pathname: '/storage/v1/object/public/media/**' }]
+    remotePatterns: convexUrl
+      ? [
+          {
+            protocol: convexUrl.protocol === 'http:' ? 'http' : 'https',
+            hostname: convexUrl.hostname,
+            port: convexUrl.port,
+            pathname: '/api/storage/**',
+          },
+        ]
       : [],
+    dangerouslyAllowLocalIP: convexIsLocal,
   },
   async headers() {
     return [

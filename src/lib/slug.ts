@@ -9,5 +9,5 @@ export function slugify(value: string): string {
     .slice(0, 80)
 }
 
-/** Stored media: an object in the `media` bucket under a known folder, or an asset shipped in /public. */
-export const MEDIA_PATH_PATTERN = /^(?:(?:services|stylists|gallery)\/[a-z0-9][a-z0-9-]*\.(?:webp|jpe?g|png|avif|mp4|webm)|\/(?:images|videos)\/[a-z0-9/._-]+)$/
+/** Stored media: a Convex storage id (an upload), or an asset shipped in /public. */
+export const MEDIA_PATH_PATTERN = /^(?:[a-z0-9]{20,64}|\/(?:images|videos)\/[a-z0-9/._-]+)$/

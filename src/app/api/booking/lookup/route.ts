@@ -4,7 +4,7 @@ import { BOOKING_COOKIE, bookingCookieOptions, sealBookingAccess } from '@/lib/b
 import { appError, toAppError } from '@/lib/booking/errors'
 import { lookupBooking } from '@/lib/booking/server'
 import { allowRequest, clientIp } from '@/lib/security/rate-limit'
-import { isServerDataConfigured } from '@/lib/supabase/admin'
+import { isServerDataConfigured } from '@/lib/convex/server'
 import { fieldErrors, lookupSchema } from '@/lib/validation'
 
 /**

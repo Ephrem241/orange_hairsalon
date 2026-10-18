@@ -1,16 +1,18 @@
 'use server'
 
+import { api } from '@convex/_generated/api'
+import type { Id } from '@convex/_generated/dataModel'
 import { refresh, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { ADMIN_ONLY, authorize, type ActionResult } from '@/lib/auth/staff'
 import { toAppError } from '@/lib/booking/errors'
+import { staffMutation } from '@/lib/convex/server'
 import { TAGS } from '@/lib/data/tags'
-import { MEDIA_BUCKET } from '@/lib/media-url'
 import { MEDIA_PATH_PATTERN } from '@/lib/slug'
-import { createSessionClient } from '@/lib/supabase/server'
+import { convexId } from '@/lib/validation'
 
 const item = z.object({
-  id: z.uuid().nullable(),
+  id: convexId().nullable(),
   mediaType: z.enum(['image', 'video']),
   mediaPath: z.string().regex(MEDIA_PATH_PATTERN, 'Upload the image or video first.'),
   posterPath: z.string().regex(MEDIA_PATH_PATTERN).nullable(),
@@ -34,44 +36,25 @@ export async function saveGalleryItem(values: z.input<typeof item>): Promise<Act
   if (v.mediaType === 'video' && !v.posterPath) return { ok: false, error: 'Videos need a poster image.' }
   if (v.beforePath && v.mediaType !== 'image') return { ok: false, error: 'Before/after pairs must be photographs.' }
 
-  const row = {
-    media_type: v.mediaType,
-    media_path: v.mediaPath,
-    poster_path: v.posterPath,
-    before_path: v.beforePath,
-    caption: v.caption || null,
-    alt_text: v.altText,
-    category: v.category,
-    source: v.source,
-    width: v.width,
-    height: v.height,
-    is_featured: v.isFeatured,
-    is_published: v.isPublished,
+  try {
+    await staffMutation(api.content.saveGalleryItem, { ...v, id: v.id as Id<'galleryItems'> | null })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
   }
-  const db = await createSessionClient()
-  let error
-  if (v.id) {
-    ;({ error } = await db.from('gallery_items').update(row).eq('id', v.id))
-  } else {
-    const { data: last } = await db.from('gallery_items').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle()
-    ;({ error } = await db.from('gallery_items').insert({ ...row, sort_order: (last?.sort_order ?? 0) + 10 }))
-  }
-  if (error) return { ok: false, error: toAppError(error).message }
   updateTag(TAGS.gallery)
   refresh()
   return { ok: true, message: v.id ? 'Saved.' : 'Added to the gallery.' }
 }
 
+/** Removes the item and its uploaded files (bundled /public assets are left alone). */
 export async function deleteGalleryItem(id: string): Promise<ActionResult> {
   const auth = await authorize(ADMIN_ONLY)
   if ('error' in auth) return auth.error
-  const db = await createSessionClient()
-  const { data: row } = await db.from('gallery_items').select('media_path, poster_path, before_path').eq('id', id).maybeSingle()
-  const { error } = await db.from('gallery_items').delete().eq('id', id)
-  if (error) return { ok: false, error: toAppError(error).message }
-  // Remove uploaded files (bundled /public assets are left alone).
-  const stored = [row?.media_path, row?.poster_path, row?.before_path].filter((p): p is string => Boolean(p) && !p!.startsWith('/'))
-  if (stored.length) await db.storage.from(MEDIA_BUCKET).remove(stored)
+  try {
+    await staffMutation(api.content.deleteGalleryItem, { id: id as Id<'galleryItems'> })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.gallery)
   refresh()
   return { ok: true, message: 'Removed from the gallery.' }
@@ -80,10 +63,12 @@ export async function deleteGalleryItem(id: string): Promise<ActionResult> {
 export async function reorderGallery(ids: string[]): Promise<ActionResult> {
   const auth = await authorize(ADMIN_ONLY)
   if ('error' in auth) return auth.error
-  if (!z.array(z.uuid()).max(1000).safeParse(ids).success) return { ok: false, error: 'Invalid order.' }
-  const db = await createSessionClient()
-  const { error } = await db.rpc('reorder_gallery', { p_ids: ids })
-  if (error) return { ok: false, error: toAppError(error).message }
+  if (!z.array(convexId()).max(1000).safeParse(ids).success) return { ok: false, error: 'Invalid order.' }
+  try {
+    await staffMutation(api.content.reorderGallery, { ids: ids as Id<'galleryItems'>[] })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.gallery)
   refresh()
   return { ok: true }

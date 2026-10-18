@@ -6,7 +6,6 @@ import { DemoBadge } from '@/components/site/DemoBadge'
 import { listCategories, listServices } from '@/lib/admin/data'
 import { ADMIN_ONLY, requirePageStaff } from '@/lib/auth/staff'
 import { formatDuration, formatEtb } from '@/lib/format'
-import { mediaUrl } from '@/lib/media-url'
 import { CategoryManager } from './CategoryManager'
 
 export const metadata: Metadata = { title: 'Services' }
@@ -31,7 +30,7 @@ export default async function ServicesAdminPage() {
                   <Td>
                     <Link href={`/admin/services/${s.id}`} className="flex items-center gap-3 font-medium hover:text-gold-700">
                       <span className="relative size-10 shrink-0 overflow-hidden rounded-sm bg-ivory-200">
-                        {s.imagePath && <Image src={mediaUrl(s.imagePath)} alt="" fill sizes="40px" className="object-cover" />}
+                        {s.imageUrl && <Image src={s.imageUrl} alt="" fill sizes="40px" className="object-cover" />}
                       </span>
                       {s.name}
                       {s.isDemo && <DemoBadge />}
@@ -49,7 +48,7 @@ export default async function ServicesAdminPage() {
             </tbody>
           </Table>
         )}
-        <CategoryManager categories={categories.map((c) => ({ id: c.id, name: c.name, description: c.description ?? '', sortOrder: c.sort_order }))} />
+        <CategoryManager categories={categories.map((c) => ({ id: c.id, name: c.name, description: c.description ?? '', sortOrder: c.sortOrder }))} />
       </div>
     </>
   )

@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   Bell, CalendarDays, ClipboardList, Contact, GalleryHorizontalEnd, LayoutDashboard, LogOut, Menu, MessageSquare,
   Scissors, Settings, ShieldCheck, Star, UserCog, Users, X, type LucideIcon,
 } from 'lucide-react'
 import { Wordmark } from '@/components/site/Wordmark'
+import { signOutOfDashboard } from '@/lib/auth/client'
 import { cn } from '@/lib/cn'
 import type { StaffRole } from '@/lib/types'
 
@@ -45,8 +46,9 @@ const SECTIONS: { label: string; items: Item[] }[] = [
 
 const ROLE_LABEL: Record<StaffRole, string> = { admin: 'Owner / admin', receptionist: 'Reception', stylist: 'Stylist' }
 
-export function AdminNav({ role, name, signOut }: { role: StaffRole; name: string; signOut: () => Promise<void> }) {
+export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const active = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href))
 
@@ -86,11 +88,17 @@ export function AdminNav({ role, name, signOut }: { role: StaffRole; name: strin
           <p className="truncate text-sm text-ivory">{name}</p>
           <p className="text-xs text-ivory/50">{ROLE_LABEL[role]}</p>
         </Link>
-        <form action={signOut}>
-          <button type="submit" className="mt-2 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ivory/60 hover:bg-ivory/5 hover:text-ivory">
-            <LogOut aria-hidden className="size-4" /> Sign out
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={async () => {
+            await signOutOfDashboard()
+            router.replace('/admin/login')
+            router.refresh()
+          }}
+          className="mt-2 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ivory/60 hover:bg-ivory/5 hover:text-ivory"
+        >
+          <LogOut aria-hidden className="size-4" /> Sign out
+        </button>
       </div>
     </nav>
   )

@@ -1,14 +1,17 @@
 'use server'
 
+import { api } from '@convex/_generated/api'
+import type { Id } from '@convex/_generated/dataModel'
 import { refresh, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { ADMIN_ONLY, authorize, type ActionResult } from '@/lib/auth/staff'
 import { toAppError } from '@/lib/booking/errors'
 import { TAGS } from '@/lib/data/tags'
-import { createSessionClient } from '@/lib/supabase/server'
+import { convexId } from '@/lib/validation'
+import { staffMutation } from '@/lib/convex/server'
 
 const review = z.object({
-  id: z.uuid().nullable(),
+  id: convexId().nullable(),
   authorName: z.string().trim().min(1, 'Enter the reviewer’s name as published.').max(80),
   rating: z.number().int().min(1).max(5).nullable(),
   body: z.string().trim().min(1, 'Paste the review text.').max(2000),
@@ -24,18 +27,11 @@ export async function saveReview(values: z.input<typeof review>): Promise<Action
   const parsed = review.safeParse(values)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
   const v = parsed.data
-  const row = {
-    author_name: v.authorName,
-    rating: v.rating,
-    body: v.body,
-    source: v.source,
-    source_url: v.sourceUrl || null,
-    reviewed_on: v.reviewedOn || null,
-    is_published: v.isPublished,
+  try {
+    await staffMutation(api.content.saveReview, { ...v, id: v.id as Id<'reviews'> | null })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
   }
-  const db = await createSessionClient()
-  const { error } = v.id ? await db.from('reviews').update(row).eq('id', v.id) : await db.from('reviews').insert(row)
-  if (error) return { ok: false, error: toAppError(error).message }
   updateTag(TAGS.reviews)
   refresh()
   return { ok: true, message: 'Review saved.' }
@@ -44,9 +40,11 @@ export async function saveReview(values: z.input<typeof review>): Promise<Action
 export async function deleteReview(id: string): Promise<ActionResult> {
   const auth = await authorize(ADMIN_ONLY)
   if ('error' in auth) return auth.error
-  const db = await createSessionClient()
-  const { error } = await db.from('reviews').delete().eq('id', id)
-  if (error) return { ok: false, error: toAppError(error).message }
+  try {
+    await staffMutation(api.content.deleteReview, { id: id as Id<'reviews'> })
+  } catch (error) {
+    return { ok: false, error: toAppError(error).message }
+  }
   updateTag(TAGS.reviews)
   refresh()
   return { ok: true, message: 'Review deleted.' }

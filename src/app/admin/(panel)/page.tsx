@@ -1,3 +1,4 @@
+import { api } from '@convex/_generated/api'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AdminButtonLink, Card, EmptyState, PageHeader, StatCard } from '@/components/admin/ui'
@@ -5,7 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { dashboardSummary, listAppointments } from '@/lib/admin/data'
 import { can, requirePageStaff } from '@/lib/auth/staff'
 import { formatEtb } from '@/lib/format'
-import { createSessionClient } from '@/lib/supabase/server'
+import { staffQuery } from '@/lib/convex/server'
 import { addDays, formatDateShort, formatTime, salonDate, salonInstant } from '@/lib/time'
 
 export const metadata: Metadata = { title: 'Overview' }
@@ -31,17 +32,12 @@ export default async function OverviewPage() {
   const now = new Date().toISOString()
   const in30 = salonInstant(addDays(today, 30), '00:00')
 
-  const db = await createSessionClient()
   const [todayList, pending, upcomingSummary, monthSummary, events] = await Promise.all([
     listAppointments({ from: startToday, to: startTomorrow, status: 'live' }),
     listAppointments({ from: now, status: 'pending', limit: 8 }),
     dashboardSummary(now, in30),
     dashboardSummary(monthStart, nextMonth),
-    db
-      .from('appointment_events')
-      .select('id, event, actor_type, created_at, appointment:appointments(id, reference, customer_name, service_name, starts_at)')
-      .order('created_at', { ascending: false })
-      .limit(10),
+    staffQuery(api.appointments.recentEvents, { limit: 10 }),
   ])
   const frontDesk = can.manageAppointments(staff)
 
@@ -56,11 +52,11 @@ export default async function OverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Today" value={todayList.length} hint="Pending and confirmed" />
         <StatCard label="Awaiting confirmation" value={upcomingSummary.pending} hint="Upcoming requests" tone={upcomingSummary.pending > 0 ? 'attention' : 'default'} />
-        <StatCard label="Next 30 days" value={upcomingSummary.confirmed} hint={`Confirmed · expected ${formatEtb(upcomingSummary.expected_revenue_etb)}`} />
+        <StatCard label="Next 30 days" value={upcomingSummary.confirmed} hint={`Confirmed · expected ${formatEtb(upcomingSummary.expectedRevenueEtb)}`} />
         <StatCard
           label="Recorded revenue this month"
-          value={formatEtb(monthSummary.recorded_revenue_etb)}
-          hint={`${monthSummary.completed} completed · ${monthSummary.cancelled} cancelled · ${monthSummary.no_show} no-show`}
+          value={formatEtb(monthSummary.recordedRevenueEtb)}
+          hint={`${monthSummary.completed} completed · ${monthSummary.cancelled} cancelled · ${monthSummary.noShow} no-show`}
         />
       </div>
       <p className="mt-3 text-xs text-taupe-700">
@@ -114,22 +110,21 @@ export default async function OverviewPage() {
           )}
 
           <Card title="Recent activity" padded={false}>
-            {(events.data ?? []).length === 0 ? (
+            {events.length === 0 ? (
               <div className="p-5">
                 <EmptyState title="No activity yet">Bookings and changes will appear here.</EmptyState>
               </div>
             ) : (
               <ul className="divide-y divide-charcoal/5">
-                {(events.data ?? []).map((e) => {
-                  const appt = e.appointment as unknown as { id: string; reference: string; customer_name: string; service_name: string } | null
-                  if (!appt) return null
+                {events.map(({ event: e, appointment: appt }) => {
+                  const at = new Date(e._creationTime).toISOString()
                   return (
-                    <li key={e.id}>
-                      <Link href={`/admin/appointments/${appt.id}`} className="block px-5 py-3 text-sm hover:bg-ivory-200/50">
+                    <li key={e._id}>
+                      <Link href={`/admin/appointments/${appt._id}`} className="block px-5 py-3 text-sm hover:bg-ivory-200/50">
                         <span className="font-medium">{EVENT_LABEL[e.event] ?? e.event}</span>
-                        <span className="text-taupe-700"> · {appt.customer_name} · {appt.reference}</span>
+                        <span className="text-taupe-700"> · {appt.customerName} · {appt.reference}</span>
                         <span className="block text-xs text-taupe-700">
-                          {e.actor_type === 'customer' ? 'By client online' : e.actor_type === 'staff' ? 'By staff' : 'System'} · {formatDateShort(e.created_at)} {formatTime(e.created_at)}
+                          {e.actorType === 'customer' ? 'By client online' : e.actorType === 'staff' ? 'By staff' : 'System'} · {formatDateShort(at)} {formatTime(at)}
                         </span>
                       </Link>
                     </li>

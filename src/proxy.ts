@@ -1,41 +1,29 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { convexAuthNextjsMiddleware, createRouteMatcher, nextjsMiddlewareRedirect } from '@convex-dev/auth/nextjs/server'
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
+
+const isLoginPage = createRouteMatcher(['/admin/login'])
 
 /**
- * Keeps staff sessions fresh on dashboard routes and sends signed-out visitors
- * to the login page. This is an optimistic check only — every dashboard page,
- * server action and database query re-verifies the user and their role.
+ * Convex Auth for the dashboard: handles sign-in/sign-out posted to /api/auth,
+ * keeps staff sessions fresh, and sends signed-out visitors to the login page.
+ * This is an optimistic check only — every dashboard page, server action and
+ * Convex function re-verifies the user and their role.
  */
-export async function proxy(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  if (!url || !key) return NextResponse.next()
+const withConvexAuth = convexAuthNextjsMiddleware(
+  async (request, { convexAuth }) => {
+    if (!isLoginPage(request) && !(await convexAuth.isAuthenticated())) {
+      return nextjsMiddlewareRedirect(request, '/admin/login')
+    }
+  },
+  // Keep staff signed in across browser restarts for as long as the session lasts (30 days).
+  { cookieConfig: { maxAge: 60 * 60 * 24 * 30 } },
+)
 
-  let response = NextResponse.next({ request })
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll(cookiesToSet, headers) {
-        for (const { name, value } of cookiesToSet) request.cookies.set(name, value)
-        response = NextResponse.next({ request })
-        for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options)
-        for (const [header, value] of Object.entries(headers ?? {})) response.headers.set(header, value)
-      },
-    },
-  })
-
-  const { data } = await supabase.auth.getUser()
-  const isLogin = request.nextUrl.pathname.startsWith('/admin/login')
-  if (!data.user && !isLogin) {
-    const login = request.nextUrl.clone()
-    login.pathname = '/admin/login'
-    login.search = ''
-    return NextResponse.redirect(login)
-  }
-  response.headers.set('Cache-Control', 'private, no-store')
-  return response
+export function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) return NextResponse.next()
+  return withConvexAuth(request, event)
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/api/auth'],
 }

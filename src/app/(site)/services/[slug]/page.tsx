@@ -9,7 +9,6 @@ import { ServiceCard } from '@/components/site/ServiceCard'
 import { ButtonLink } from '@/components/ui/Button'
 import { getServiceBySlug, getServices, getStylists } from '@/lib/data/public'
 import { formatDuration, formatEtb } from '@/lib/format'
-import { mediaUrl } from '@/lib/media-url'
 import { pageMetadata } from '@/lib/seo'
 
 /** Placeholder so the route validates at build time before any services exist. */
@@ -30,7 +29,7 @@ export async function generateMetadata({ params }: PageProps<'/services/[slug]'>
       service.summary ??
       `${service.name} at Orange Salon, Addis Ababa — ${formatEtb(service.priceEtb, service.priceType)}, about ${formatDuration(service.durationMin)}.`,
     path: `/services/${service.slug}`,
-    image: service.imagePath ? mediaUrl(service.imagePath) : undefined,
+    image: service.imagePath ? service.imagePath : undefined,
   })
 }
 
@@ -56,7 +55,7 @@ async function ServiceDetail({ params }: Pick<PageProps<'/services/[slug]'>, 'pa
         <div className="container-x grid gap-12 pb-20 md:grid-cols-2 md:items-center md:gap-16 md:pb-28">
           <div className="relative aspect-[4/5] overflow-hidden rounded-sm bg-charcoal-700">
             {service.imagePath ? (
-              <Image src={mediaUrl(service.imagePath)} alt="" fill preload sizes="(min-width: 768px) 45vw, 90vw" className="object-cover" />
+              <Image src={service.imagePath} alt="" fill preload sizes="(min-width: 768px) 45vw, 90vw" className="object-cover" />
             ) : (
               <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_#3b3630,_#171513)]" />
             )}

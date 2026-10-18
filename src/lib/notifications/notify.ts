@@ -1,6 +1,8 @@
 import 'server-only'
 import { siteUrl } from '@/config/site'
-import { createAdminClient, isServerDataConfigured } from '@/lib/supabase/admin'
+import type { Id } from '@convex/_generated/dataModel'
+import { api } from '@convex/_generated/api'
+import { isServerDataConfigured, serverMutation, serverQuery } from '@/lib/convex/server'
 import { deliver, dispatch } from './dispatch'
 import { ResendEmailProvider, WhatsAppCloudProvider, whatsappTemplateFor } from './providers'
 import { buildEmail, whatsappParams, type AppointmentContext, type SalonContext } from './templates'
@@ -11,46 +13,25 @@ const providers: Record<NotificationChannel, NotificationProvider> = {
   whatsapp: new WhatsAppCloudProvider(),
 }
 
-function supabaseLogStore(): NotificationLogStore {
-  const db = createAdminClient()
+function convexLogStore(): NotificationLogStore {
   return {
     async create(entry) {
-      const { data, error } = await db
-        .from('notification_log')
-        .insert({
-          appointment_id: entry.appointmentId,
-          event: entry.event,
-          channel: entry.channel,
-          recipient: entry.recipient,
-          dedupe_key: entry.dedupeKey,
-          status: entry.status,
-          provider: entry.provider,
-        })
-        .select('id')
-        .single()
-      if (error) {
-        if (error.code === '23505') return null // already sent for this dedupe key
-        throw new Error(`notification_log insert failed: ${error.message}`)
-      }
-      return data.id as string
+      return await serverMutation(api.notifications.logCreate, {
+        appointmentId: entry.appointmentId as Id<'appointments'> | null,
+        event: entry.event,
+        channel: entry.channel,
+        recipient: entry.recipient,
+        dedupeKey: entry.dedupeKey,
+        status: entry.status,
+        provider: entry.provider,
+      })
     },
     async update(id, patch) {
-      let attempts: number | undefined
-      if (patch.incrementAttempts) {
-        const { data } = await db.from('notification_log').select('attempts').eq('id', id).single()
-        attempts = ((data?.attempts as number | undefined) ?? 0) + 1
+      try {
+        await serverMutation(api.notifications.logUpdate, { id: id as Id<'notificationLog'>, ...patch })
+      } catch (error) {
+        console.error('[notify] could not update log', id, (error as Error).message)
       }
-      const { error } = await db
-        .from('notification_log')
-        .update({
-          status: patch.status,
-          ...(patch.providerMessageId !== undefined ? { provider_message_id: patch.providerMessageId } : {}),
-          ...(patch.error !== undefined ? { error: patch.error } : {}),
-          ...(attempts !== undefined ? { attempts } : {}),
-          ...(patch.status === 'sent' ? { sent_at: new Date().toISOString() } : {}),
-        })
-        .eq('id', id)
-      if (error) console.error('[notify] could not update log', id, error.message)
     },
   }
 }
@@ -62,44 +43,18 @@ type Loaded = {
 }
 
 async function load(appointmentId: string): Promise<Loaded | null> {
-  const db = createAdminClient()
-  const [{ data: a }, { data: s }, { data: n }] = await Promise.all([
-    db
-      .from('appointments')
-      .select('id, reference, service_name, starts_at, customer_name, customer_email, customer_phone, price_etb, price_type, cancel_reason, stylist:stylists(display_name)')
-      .eq('id', appointmentId)
-      .maybeSingle(),
-    db.from('business_settings').select('name, phone, address_line, city').eq('id', 1).maybeSingle(),
-    db.from('notification_settings').select('*').eq('id', 1).maybeSingle(),
-  ])
-  if (!a || !s) return null
-  const stylist = a.stylist as { display_name?: string } | null
+  const ctx = await serverQuery(api.notifications.context, { appointmentId: appointmentId as Id<'appointments'> })
+  if (!ctx) return null
+  const { appointment: a, salon: s } = ctx
   return {
-    appointment: {
-      id: a.id,
-      reference: a.reference,
-      serviceName: a.service_name,
-      stylistName: stylist?.display_name ?? null,
-      startsAt: a.starts_at,
-      customerName: a.customer_name,
-      priceEtb: a.price_etb,
-      priceType: a.price_type,
-      cancelReason: a.cancel_reason,
-      email: a.customer_email,
-      phone: a.customer_phone,
-    },
+    appointment: { ...a, startsAt: new Date(a.startsAt).toISOString() },
     salon: {
       name: s.name,
       phone: s.phone,
-      address: [s.address_line, s.city].filter(Boolean).join(', '),
+      address: [s.addressLine, s.city].filter(Boolean).join(', '),
       siteUrl,
     },
-    prefs: {
-      emailEnabled: n?.email_enabled ?? true,
-      whatsappEnabled: n?.whatsapp_enabled ?? false,
-      salonAlertEmail: n?.salon_alert_email ?? null,
-      remindersEnabled: n?.reminders_enabled ?? true,
-    },
+    prefs: ctx.prefs,
   }
 }
 
@@ -128,7 +83,7 @@ export async function notifyAppointment(
   try {
     const ctx = await load(appointmentId)
     if (!ctx) return []
-    const log = supabaseLogStore()
+    const log = convexLogStore()
     const a = ctx.appointment
     // Events that can happen once per appointment are deduplicated; reschedules
     // and reminders are keyed on the appointment time they refer to.
@@ -156,12 +111,11 @@ export async function notifyAppointment(
 
 /** Re-send a logged notification (dashboard "Retry"). */
 export async function retryNotification(logId: string): Promise<DispatchOutcome> {
-  const db = createAdminClient()
-  const { data: row } = await db.from('notification_log').select('*').eq('id', logId).maybeSingle()
-  if (!row?.appointment_id) return { status: 'failed', logId, error: 'Notification not found.' }
-  const ctx = await load(row.appointment_id)
+  const row = await serverQuery(api.notifications.logEntry, { id: logId as Id<'notificationLog'> })
+  if (!row?.appointmentId) return { status: 'failed', logId, error: 'Notification not found.' }
+  const ctx = await load(row.appointmentId)
   if (!ctx) return { status: 'failed', logId, error: 'Appointment not found.' }
-  const log = supabaseLogStore()
+  const log = convexLogStore()
   const message = messageFor(row.event, row.channel, row.recipient, ctx)
   const provider = providers[row.channel as NotificationChannel]
   const unavailable = provider.unavailableReason(message)

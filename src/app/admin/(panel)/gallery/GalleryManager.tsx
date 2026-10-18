@@ -9,21 +9,23 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Select, TextInput } from '@/components/ui/Field'
 import { GALLERY_CATEGORIES, galleryCategoryLabel } from '@/lib/gallery'
-import { mediaUrl } from '@/lib/media-url'
+import { isConvexId } from '@/lib/validation'
 import type { GalleryItem } from '@/lib/types'
 import { deleteGalleryItem, reorderGallery, saveGalleryItem } from './actions'
 
-type Draft = Omit<GalleryItem, 'id' | 'sortOrder'> & { id: string | null }
+/** Path fields hold stored references (saved as-is); `urls` are for display. */
+export type AdminGalleryItem = GalleryItem & { urls: { media: string | null; poster: string | null; before: string | null } }
+
+type Draft = Omit<AdminGalleryItem, 'id' | 'sortOrder'> & { id: string | null }
 
 const blank: Draft = {
   id: null, mediaType: 'image', mediaPath: '', posterPath: null, beforePath: null, caption: '', altText: '', category: 'braids',
-  source: 'salon', width: null, height: null, isFeatured: false, isPublished: true,
+  source: 'salon', width: null, height: null, isFeatured: false, isPublished: true, urls: { media: null, poster: null, before: null },
 }
 
-export function GalleryManager({ items }: { items: GalleryItem[] }) {
+export function GalleryManager({ items }: { items: AdminGalleryItem[] }) {
   const [pending, start] = useTransition()
   const [draft, setDraft] = useState<Draft | null>(null)
-  const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id)
 
   const move = (index: number, delta: number) => {
     const ids = items.map((i) => i.id)
@@ -31,7 +33,7 @@ export function GalleryManager({ items }: { items: GalleryItem[] }) {
     if (target < 0 || target >= ids.length) return
     ;[ids[index], ids[target]] = [ids[target], ids[index]]
     start(async () => {
-      const r = await reorderGallery(ids.filter(isUuid))
+      const r = await reorderGallery(ids.filter(isConvexId))
       if (!r.ok) toast.error(r.error)
     })
   }
@@ -39,7 +41,7 @@ export function GalleryManager({ items }: { items: GalleryItem[] }) {
   const save = () =>
     draft &&
     start(async () => {
-      const r = await saveGalleryItem({ ...draft, caption: draft.caption ?? '' })
+      const r = await saveGalleryItem({ ...draft, caption: draft.caption ?? '' }) // display-only `urls` are dropped by the schema
       if (r.ok) {
         toast.success(r.message)
         setDraft(null)
@@ -54,7 +56,9 @@ export function GalleryManager({ items }: { items: GalleryItem[] }) {
         {items.map((item, index) => (
           <li key={item.id} className="overflow-hidden rounded-md border border-charcoal/10 bg-white">
             <div className="relative aspect-[4/5] bg-ivory-200">
-              <Image src={mediaUrl(item.mediaType === 'video' ? item.posterPath! : item.mediaPath)} alt={item.altText} fill sizes="(min-width: 1280px) 22vw, 45vw" className="object-cover" />
+              {(item.mediaType === 'video' ? item.urls.poster : item.urls.media) && (
+                <Image src={(item.mediaType === 'video' ? item.urls.poster : item.urls.media)!} alt={item.altText} fill sizes="(min-width: 1280px) 22vw, 45vw" className="object-cover" />
+              )}
               <div className="absolute top-2 left-2 flex flex-wrap gap-1 text-[0.625rem] font-semibold tracking-wide uppercase">
                 {!item.isPublished && <span className="rounded-sm bg-charcoal/80 px-1.5 py-0.5 text-ivory">Hidden</span>}
                 {item.isFeatured && <span className="rounded-sm bg-gold px-1.5 py-0.5 text-charcoal">Featured</span>}
@@ -90,7 +94,7 @@ export function GalleryManager({ items }: { items: GalleryItem[] }) {
               <div className="flex gap-4 text-sm">
                 {(['image', 'video'] as const).map((t) => (
                   <label key={t} className="flex items-center gap-2">
-                    <input type="radio" checked={draft.mediaType === t} onChange={() => setDraft({ ...draft, mediaType: t, mediaPath: '', posterPath: null, beforePath: null })} className="accent-[#171513]" />
+                    <input type="radio" checked={draft.mediaType === t} onChange={() => setDraft({ ...draft, mediaType: t, mediaPath: '', posterPath: null, beforePath: null, urls: { media: null, poster: null, before: null } })} className="accent-[#171513]" />
                     {t === 'image' ? 'Photo' : 'Video'}
                   </label>
                 ))}
@@ -98,16 +102,16 @@ export function GalleryManager({ items }: { items: GalleryItem[] }) {
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <MediaUpload
-                folder="gallery"
                 accept={draft.mediaType}
                 label={draft.mediaType === 'image' ? 'Photo (after)' : 'Video (MP4/WebM, no sound needed)'}
                 value={draft.mediaPath || null}
-                onChange={(m) => setDraft({ ...draft, mediaPath: m?.path ?? '', width: m?.width ?? draft.width, height: m?.height ?? draft.height })}
+                previewUrl={draft.urls.media}
+                onChange={(m) => setDraft({ ...draft, mediaPath: m?.path ?? '', urls: { ...draft.urls, media: m?.url ?? null }, width: m?.width ?? draft.width, height: m?.height ?? draft.height })}
               />
               {draft.mediaType === 'video' ? (
-                <MediaUpload folder="gallery" label="Poster image" value={draft.posterPath} onChange={(m) => setDraft({ ...draft, posterPath: m?.path ?? null, width: m?.width ?? draft.width, height: m?.height ?? draft.height })} />
+                <MediaUpload label="Poster image" value={draft.posterPath} previewUrl={draft.urls.poster} onChange={(m) => setDraft({ ...draft, posterPath: m?.path ?? null, urls: { ...draft.urls, poster: m?.url ?? null }, width: m?.width ?? draft.width, height: m?.height ?? draft.height })} />
               ) : (
-                <MediaUpload folder="gallery" label="Before photo (optional, same client)" value={draft.beforePath} onChange={(m) => setDraft({ ...draft, beforePath: m?.path ?? null })} />
+                <MediaUpload label="Before photo (optional, same client)" value={draft.beforePath} previewUrl={draft.urls.before} onChange={(m) => setDraft({ ...draft, beforePath: m?.path ?? null, urls: { ...draft.urls, before: m?.url ?? null } })} />
               )}
             </div>
             <Field label="Alt text" hint="Describe what is in the picture.">

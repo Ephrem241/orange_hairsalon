@@ -1,5 +1,5 @@
 /**
- * The booking engine raises stable UPPER_SNAKE codes (see the SQL migrations).
+ * The Convex backend raises stable UPPER_SNAKE codes (ConvexError data.code, see convex/lib/errors.ts).
  * This maps them to HTTP statuses and copy a customer or staff member can act on.
  */
 type ErrorInfo = { status: number; message: string }
@@ -41,17 +41,33 @@ const ERRORS: Record<string, ErrorInfo> = {
   INVALID_SCHEDULE: { status: 422, message: 'Each period must end after it starts.' },
   STYLIST_LINK_REQUIRED: { status: 422, message: 'Stylist logins must be linked to a stylist profile.' },
   RATE_LIMITED: { status: 429, message: 'Too many attempts. Please wait a few minutes and try again.' },
+  INVALID_INPUT: { status: 422, message: 'Please check the details and try again.' },
+  SLUG_TAKEN: { status: 409, message: 'Another item already uses this web address (slug).' },
+  HAS_BOOKINGS: { status: 409, message: 'This service has bookings, so it can’t be deleted. Switch it off (inactive) instead.' },
+  POSTER_REQUIRED: { status: 422, message: 'Videos need a poster image.' },
+  INVALID_UPLOAD: { status: 422, message: 'Use a JPEG, PNG, WebP or AVIF image up to 8 MB, or an MP4 or WebM video up to 50 MB.' },
+  WEAK_PASSWORD: { status: 422, message: 'Use between 12 and 128 characters.' },
+  ACCOUNT_EXISTS: { status: 409, message: 'An account with this email already exists.' },
+  STYLIST_ALREADY_LINKED: { status: 409, message: 'That stylist profile already has its own login.' },
 }
 
 export type AppError = { code: string; status: number; message: string }
 
-/** Extract the engine code from a Supabase/PostgREST error (or anything thrown). */
+/** The error code carried by a thrown ConvexError (or anything else thrown). */
+export function errorCode(error: unknown): string {
+  const data = (error as { data?: unknown } | null)?.data
+  if (data && typeof data === 'object' && typeof (data as { code?: unknown }).code === 'string') return (data as { code: string }).code
+  // Argument validation (e.g. a malformed id) means the request itself was wrong.
+  if (/ArgumentValidationError/.test((error as Error | null)?.message ?? '')) return 'INVALID_INPUT'
+  return 'UNKNOWN'
+}
+
+/** Map anything thrown by a Convex call to an HTTP status and friendly copy. */
 export function toAppError(error: unknown): AppError {
-  const e = error as { message?: string; code?: string } | null
-  const raw = e?.message ?? ''
-  const code = raw.match(/^[A-Z][A-Z_]+$/) ? raw : e?.code === '42501' ? 'FORBIDDEN' : 'UNKNOWN'
+  const code = errorCode(error)
   const info = ERRORS[code]
   if (!info) {
+    console.error('[convex] unexpected error', error)
     return { code: 'UNKNOWN', status: 500, message: 'Something went wrong on our side. Please try again, or call the salon.' }
   }
   return { code, ...info }

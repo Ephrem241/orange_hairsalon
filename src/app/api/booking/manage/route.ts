@@ -1,13 +1,14 @@
+import { api } from '@convex/_generated/api'
 import { after, NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { errorResponse, readJson, validationResponse } from '@/lib/api'
 import { BOOKING_COOKIE, bookingCookieOptions, sealBookingAccess } from '@/lib/booking/access'
 import { appError, toAppError } from '@/lib/booking/errors'
-import { appointmentIdForReference, currentBookingAccess } from '@/lib/booking/server'
+import { currentBookingAccess } from '@/lib/booking/server'
 import { mapCustomerBooking } from '@/lib/data/mappers'
 import { notifyAppointment } from '@/lib/notifications/notify'
 import { allowRequest, clientIp } from '@/lib/security/rate-limit'
-import { createAdminClient, isServerDataConfigured } from '@/lib/supabase/admin'
+import { isServerDataConfigured, serverMutation, serverQuery } from '@/lib/convex/server'
 import { isIsoDate } from '@/lib/time'
 import { cancelSchema, fieldErrors, rescheduleSchema } from '@/lib/validation'
 
@@ -21,14 +22,14 @@ export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get('date')
   if (!isIsoDate(date)) return validationResponse({ date: 'Choose a date.' })
 
-  const { data, error } = await createAdminClient().rpc('customer_reschedule_slots', {
-    p_reference: access.reference,
-    p_phone: access.phone,
-    p_date: date,
-  })
-  if (error) return errorResponse(toAppError(error))
+  let slots: number[]
+  try {
+    slots = await serverQuery(api.booking.rescheduleSlots, { reference: access.reference, phone: access.phone, date, now: Date.now() })
+  } catch (error) {
+    return errorResponse(toAppError(error))
+  }
   return NextResponse.json(
-    { date, slots: (data as string[]).map((s) => ({ startsAt: new Date(s).toISOString(), stylistsFree: 1 })) },
+    { date, slots: slots.map((s) => ({ startsAt: new Date(s).toISOString(), stylistsFree: 1 })) },
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
@@ -48,20 +49,21 @@ export async function POST(request: Request) {
   const parsed = action.safeParse(await readJson(request))
   if (!parsed.success) return validationResponse(fieldErrors(parsed.error))
 
-  const db = createAdminClient()
-  const result =
-    parsed.data.action === 'cancel'
-      ? await db.rpc('customer_cancel', { p_reference: access.reference, p_phone: access.phone, p_reason: parsed.data.reason })
-      : await db.rpc('customer_reschedule', { p_reference: access.reference, p_phone: access.phone, p_new_start: parsed.data.startsAt })
-  if (result.error) return errorResponse(toAppError(result.error))
+  let result
+  try {
+    result =
+      parsed.data.action === 'cancel'
+        ? await serverMutation(api.booking.cancel, { reference: access.reference, phone: access.phone, reason: parsed.data.reason })
+        : await serverMutation(api.booking.reschedule, { reference: access.reference, phone: access.phone, startsAt: Date.parse(parsed.data.startsAt) })
+  } catch (error) {
+    return errorResponse(toAppError(error))
+  }
 
   const event = parsed.data.action === 'cancel' ? 'cancelled' : 'rescheduled'
-  after(async () => {
-    const id = await appointmentIdForReference(access.reference)
-    if (id) await notifyAppointment(id, event)
-  })
+  const appointmentId = result.appointmentId
+  after(() => notifyAppointment(appointmentId, event))
 
-  const response = NextResponse.json({ booking: mapCustomerBooking(result.data as Record<string, unknown>) })
+  const response = NextResponse.json({ booking: mapCustomerBooking(result.booking) })
   // Refresh the access window after a successful change.
   response.cookies.set(BOOKING_COOKIE, sealBookingAccess(access.reference, access.phone), bookingCookieOptions)
   return response

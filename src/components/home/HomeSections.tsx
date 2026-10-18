@@ -12,7 +12,6 @@ import { StylistCard } from '@/components/site/StylistCard'
 import { ButtonAnchor, ButtonLink } from '@/components/ui/Button'
 import { formatPhone, mapsSearchHref, telHref } from '@/lib/format'
 import { groupHours } from '@/lib/hours'
-import { mediaUrl } from '@/lib/media-url'
 import type { BusinessHours, BusinessSettings, GalleryItem, Review, Service, Stylist } from '@/lib/types'
 
 export function Introduction({ city }: { city: string }) {
@@ -113,7 +112,7 @@ export function SignatureServices({ services, gallery, phone }: { services: Serv
             <Reveal key={craft.category} delay={i * 120}>
               <Link href={`/gallery?category=${craft.category}`} className="group relative block aspect-[3/4] overflow-hidden rounded-sm">
                 <Image
-                  src={mediaUrl(craft.image!.mediaPath)}
+                  src={craft.image!.mediaPath}
                   alt={craft.image!.altText}
                   fill
                   sizes="(min-width: 768px) 30vw, 90vw"
@@ -176,7 +175,7 @@ function GalleryTile({ item, sizes, className }: { item: GalleryItem; sizes: str
   return (
     <figure className={`group relative h-full overflow-hidden rounded-sm bg-charcoal-700 ${className ?? ''}`}>
       <Image
-        src={mediaUrl(item.mediaPath)}
+        src={item.mediaPath}
         alt={item.altText}
         fill
         sizes={sizes}
@@ -206,7 +205,7 @@ export function BeforeAfterSection({ gallery }: { gallery: GalleryItem[] }) {
           {pair.caption && <p className="mt-6 max-w-md text-taupe-700">{pair.caption}</p>}
         </Reveal>
         <Reveal delay={150}>
-          <BeforeAfter before={mediaUrl(pair.beforePath)} after={mediaUrl(pair.mediaPath)} alt={pair.altText} />
+          <BeforeAfter before={pair.beforePath} after={pair.mediaPath} alt={pair.altText} />
         </Reveal>
       </div>
     </section>

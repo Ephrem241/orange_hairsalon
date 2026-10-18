@@ -14,11 +14,38 @@ describe('verified seed', () => {
     await t.mutation(internal.seed.verified, {}) // idempotent
   })
 
-  it('seeds only verified business details', async () => {
+  it('seeds only verified business details, including the salon’s map pin', async () => {
     const settings = await t.query(api.public.settings, {})
-    expect(settings).toMatchObject({ name: 'Orange Salon', phone: '+251912419748', addressLine: 'Ednamoll Street', city: 'Addis Ababa', socials: {} })
+    expect(settings).toMatchObject({
+      name: 'Orange Salon',
+      phone: '+251912419748',
+      addressLine: 'Ednamoll Street',
+      city: 'Addis Ababa',
+      mapUrl: 'https://maps.app.goo.gl/v35jnnonHKEXdFyr8',
+      latitude: 8.9949867,
+      longitude: 38.7851034,
+      socials: {},
+    })
     expect(settings?.email).toBeUndefined()
     expect(settings?.whatsapp).toBeUndefined()
+  })
+
+  it('adds a missing map pin to existing settings but never overwrites the owner’s', async () => {
+    const t2 = convexTest(schema, modules)
+    await t2.mutation(internal.seed.verified, {})
+    await t2.run(async (ctx) => {
+      const s = (await ctx.db.query('businessSettings').first())!
+      await ctx.db.patch('businessSettings', s._id, { mapUrl: undefined, latitude: undefined, longitude: undefined })
+    })
+    await t2.mutation(internal.seed.verified, {})
+    expect(await t2.query(api.public.settings, {})).toMatchObject({ mapUrl: 'https://maps.app.goo.gl/v35jnnonHKEXdFyr8', latitude: 8.9949867 })
+
+    await t2.run(async (ctx) => {
+      const s = (await ctx.db.query('businessSettings').first())!
+      await ctx.db.patch('businessSettings', s._id, { mapUrl: 'https://maps.app.goo.gl/owner-choice' })
+    })
+    await t2.mutation(internal.seed.verified, {})
+    expect((await t2.query(api.public.settings, {}))?.mapUrl).toBe('https://maps.app.goo.gl/owner-choice')
   })
 
   it('seeds the verified opening hours', async () => {
@@ -62,6 +89,31 @@ describe('demo seed', () => {
     expect(await t.query(api.public.services, {})).toEqual([])
     expect(await t.query(api.public.stylists, {})).toEqual([])
     expect(await t.query(api.public.categories, {})).toEqual([])
+  })
+})
+
+describe('starter menu', () => {
+  const t = convexTest(schema, modules)
+
+  it('publishes the menu as real rows: no demo names or flags, and no stylists', async () => {
+    await t.mutation(internal.seed.sampleMenu, {})
+    await t.mutation(internal.seed.sampleMenu, {}) // idempotent
+    const services = await t.query(api.public.services, {})
+    expect(services).toHaveLength(8)
+    expect(services.every((s) => !s.isDemo && !s.name.includes('demo') && !s.slug.startsWith('demo-'))).toBe(true)
+    expect(services.every((s) => s.category !== null)).toBe(true)
+    expect(await t.query(api.public.stylists, {})).toEqual([])
+  })
+
+  it('keeps its categories when demo data that shared them is removed', async () => {
+    vi.stubEnv('ALLOW_DEMO_SEED', 'true')
+    await t.mutation(internal.seed.demo, {})
+    await t.mutation(internal.seed.sampleMenu, {})
+    await t.mutation(internal.seed.removeDemo, {})
+    const services = await t.query(api.public.services, {})
+    expect(services).toHaveLength(8)
+    expect(services.every((s) => s.category !== null)).toBe(true)
+    expect(await t.query(api.public.categories, {})).toHaveLength(5)
   })
 })
 

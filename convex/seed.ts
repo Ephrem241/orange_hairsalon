@@ -2,14 +2,18 @@
  * Seeds. Run with the CLI (internal functions are not callable from the web):
  *
  *   npx convex run seed:verified     — production content (idempotent)
+ *   npx convex run seed:sampleMenu   — the starter service menu, published as real rows
  *   npx convex run seed:demo         — DEVELOPMENT ONLY sample menu and team
  *   npx convex run seed:removeDemo   — delete everything seed:demo created
  *
  * `verified` writes only details the salon has confirmed: name, phone
- * (+251 91 241 9748), address (Ednamoll Street), opening hours and genuine
- * photographs and reels of work done at the salon. Services, prices, stylists,
- * reviews and social links are intentionally not seeded; the owner enters
- * them in the dashboard.
+ * (+251 91 241 9748), address (Ednamoll Street) and its map pin, opening
+ * hours and genuine photographs and reels of work done at the salon.
+ *
+ * `sampleMenu` publishes the starter menu the owner chose to show while the
+ * real one is prepared. Its prices are placeholders to correct in the
+ * dashboard; it adds no stylists, so online booking stays closed until real
+ * stylists and hours exist.
  *
  * `demo` refuses to run unless ALLOW_DEMO_SEED=true is set on the deployment
  * (`npx convex env set ALLOW_DEMO_SEED true`). Never set it on production.
@@ -24,6 +28,9 @@ const POLICY =
   'Online bookings are requests until our team confirms them. Please arrive a few minutes early. ' +
   'If you need to cancel or move your appointment, please do so at least 12 hours beforehand ' +
   'using your booking reference, or call us. Payment is taken at the salon.'
+
+// The salon's Google Maps pin ("Orange Salon ኦሬንጅ ሳሎን"), confirmed by the owner.
+const LOCATION = { mapUrl: 'https://maps.app.goo.gl/v35jnnonHKEXdFyr8', latitude: 8.9949867, longitude: 38.7851034 }
 
 // 0 = Sunday. Mon–Sat 08:00–20:00, Sun 09:00–19:30.
 const HOURS = [
@@ -58,10 +65,22 @@ const GALLERY: GallerySeed[] = [
   { mediaType: 'video', mediaPath: '/videos/gallery/cornrows-with-natural-volume.mp4', posterPath: '/videos/gallery/cornrows-with-natural-volume-poster.jpg', caption: 'Cornrows with natural volume', altText: 'Short video of fine front cornrows leading into full natural curls', category: 'braids', width: 540, height: 960, isFeatured: false },
 ]
 
-/** Settings, hours and gallery; existing rows are left untouched. */
+/**
+ * Settings, hours and gallery. Existing rows are left untouched, except that a
+ * settings document without a map location gets the verified one.
+ */
 export async function seedVerified(ctx: MutationCtx) {
   const now = Date.now()
-  if (!(await ctx.db.query('businessSettings').first())) {
+  const settings = await ctx.db.query('businessSettings').first()
+  if (settings) {
+    const missing = {
+      ...(settings.mapUrl === undefined ? { mapUrl: LOCATION.mapUrl } : {}),
+      ...(settings.latitude === undefined && settings.longitude === undefined
+        ? { latitude: LOCATION.latitude, longitude: LOCATION.longitude }
+        : {}),
+    }
+    if (Object.keys(missing).length > 0) await ctx.db.patch('businessSettings', settings._id, { ...missing, updatedAt: now })
+  } else {
     await ctx.db.insert('businessSettings', {
       name: 'Orange Salon',
       tagline: 'Your Hair. Your Style. Your Confidence.',
@@ -69,6 +88,7 @@ export async function seedVerified(ctx: MutationCtx) {
       addressLine: 'Ednamoll Street',
       city: 'Addis Ababa',
       countryCode: 'ET',
+      ...LOCATION,
       socials: {},
       policyText: POLICY,
       onlineBookingEnabled: true,
@@ -110,8 +130,8 @@ export const verified = internalMutation({
   },
 })
 
-// ── Development demo data ────────────────────────────────────────────────────
-const DEMO_CATEGORIES = [
+// ── Starter menu ─────────────────────────────────────────────────────────────
+const SAMPLE_CATEGORIES = [
   { slug: 'braids', name: 'Braids & Protective Styles', description: 'Knotless braids, twists and cornrows.', sortOrder: 10 },
   { slug: 'colour', name: 'Colour', description: 'Full colour, highlights and balayage.', sortOrder: 20 },
   { slug: 'cuts-styling', name: 'Cuts & Styling', description: 'Cuts, blow-dries and finishing.', sortOrder: 30 },
@@ -119,21 +139,70 @@ const DEMO_CATEGORIES = [
   { slug: 'bridal', name: 'Bridal & Events', description: 'Styling for weddings and special occasions.', sortOrder: 50 },
 ]
 
-const DEMO_SERVICES = [
-  { category: 'braids', slug: 'demo-knotless-braids', name: 'Knotless Braids (demo)', summary: 'Lightweight, natural-looking braids.', imagePath: '/images/gallery/copper-passion-twists.jpg', priceEtb: 4500, priceType: 'from', durationMin: 240, bufferMin: 15, isFeatured: true, sortOrder: 10 },
-  { category: 'braids', slug: 'demo-stitch-braids', name: 'Stitch Braids (demo)', summary: 'Clean, defined cornrow patterns.', imagePath: '/images/gallery/stitch-braids-curly-ponytail.jpg', priceEtb: 3000, priceType: 'from', durationMin: 150, bufferMin: 15, isFeatured: true, sortOrder: 20 },
-  { category: 'colour', slug: 'demo-colour-highlights', name: 'Colour & Highlights (demo)', summary: 'Dimensional colour, tailored to you.', imagePath: '/images/gallery/burgundy-waves-highlights.jpg', priceEtb: 3500, priceType: 'from', durationMin: 180, bufferMin: 15, isFeatured: true, sortOrder: 30 },
-  { category: 'colour', slug: 'demo-balayage', name: 'Balayage (demo)', summary: 'Soft, sun-kissed colour.', imagePath: '/images/gallery/balayage-waves.jpg', priceEtb: 5000, priceType: 'from', durationMin: 210, bufferMin: 15, isFeatured: false, sortOrder: 40 },
-  { category: 'cuts-styling', slug: 'demo-curls-styling', name: 'Curls & Styling (demo)', summary: 'Defined curls for any occasion.', imagePath: '/images/gallery/blonde-spiral-curls.jpg', priceEtb: 1200, priceType: 'fixed', durationMin: 75, bufferMin: 10, isFeatured: true, sortOrder: 50 },
-  { category: 'cuts-styling', slug: 'demo-silk-press', name: 'Silk Press (demo)', summary: 'Smooth, glossy and swingy.', imagePath: '/images/gallery/stylist-at-work.jpg', priceEtb: 1500, priceType: 'fixed', durationMin: 90, bufferMin: 10, isFeatured: false, sortOrder: 60 },
-  { category: 'treatments', slug: 'demo-deep-treatment', name: 'Deep Treatment (demo)', summary: 'Nourish, repair and restore.', imagePath: undefined, priceEtb: 900, priceType: 'fixed', durationMin: 45, bufferMin: 10, isFeatured: false, sortOrder: 70 },
-  { category: 'bridal', slug: 'demo-bridal-styling', name: 'Bridal Styling (demo)', summary: 'Elegant styling for your day.', imagePath: undefined, priceEtb: 6000, priceType: 'from', durationMin: 180, bufferMin: 30, isFeatured: true, sortOrder: 80 },
+// Prices are placeholders until the owner sets the real ones in the dashboard.
+const SAMPLE_SERVICES = [
+  { category: 'braids', slug: 'knotless-braids', name: 'Knotless Braids', summary: 'Lightweight, natural-looking braids.', imagePath: '/images/gallery/copper-passion-twists.jpg', priceEtb: 4500, priceType: 'from', durationMin: 240, bufferMin: 15, isFeatured: true, sortOrder: 10 },
+  { category: 'braids', slug: 'stitch-braids', name: 'Stitch Braids', summary: 'Clean, defined cornrow patterns.', imagePath: '/images/gallery/stitch-braids-curly-ponytail.jpg', priceEtb: 3000, priceType: 'from', durationMin: 150, bufferMin: 15, isFeatured: true, sortOrder: 20 },
+  { category: 'colour', slug: 'colour-highlights', name: 'Colour & Highlights', summary: 'Dimensional colour, tailored to you.', imagePath: '/images/gallery/burgundy-waves-highlights.jpg', priceEtb: 3500, priceType: 'from', durationMin: 180, bufferMin: 15, isFeatured: true, sortOrder: 30 },
+  { category: 'colour', slug: 'balayage', name: 'Balayage', summary: 'Soft, sun-kissed colour.', imagePath: '/images/gallery/balayage-waves.jpg', priceEtb: 5000, priceType: 'from', durationMin: 210, bufferMin: 15, isFeatured: false, sortOrder: 40 },
+  { category: 'cuts-styling', slug: 'curls-styling', name: 'Curls & Styling', summary: 'Defined curls for any occasion.', imagePath: '/images/gallery/blonde-spiral-curls.jpg', priceEtb: 1200, priceType: 'fixed', durationMin: 75, bufferMin: 10, isFeatured: true, sortOrder: 50 },
+  { category: 'cuts-styling', slug: 'silk-press', name: 'Silk Press', summary: 'Smooth, glossy and swingy.', imagePath: '/images/gallery/stylist-at-work.jpg', priceEtb: 1500, priceType: 'fixed', durationMin: 90, bufferMin: 10, isFeatured: false, sortOrder: 60 },
+  { category: 'treatments', slug: 'deep-treatment', name: 'Deep Treatment', summary: 'Nourish, repair and restore.', imagePath: undefined, priceEtb: 900, priceType: 'fixed', durationMin: 45, bufferMin: 10, isFeatured: false, sortOrder: 70 },
+  { category: 'bridal', slug: 'bridal-styling', name: 'Bridal Styling', summary: 'Elegant styling for your day.', imagePath: undefined, priceEtb: 6000, priceType: 'from', durationMin: 180, bufferMin: 30, isFeatured: true, sortOrder: 80 },
 ] as const
 
+/**
+ * Inserts the starter categories and services (skipping slugs that already
+ * exist) and returns their ids by slug. A category left over from the demo
+ * seed is adopted as a real one, so removeDemo never deletes it from under
+ * the real menu.
+ */
+async function insertMenu(ctx: MutationCtx, opts: { isDemo: boolean }) {
+  const now = Date.now()
+  const slugOf = (slug: string) => (opts.isDemo ? `demo-${slug}` : slug)
+
+  const categoryIds = new Map<string, Id<'serviceCategories'>>()
+  for (const c of SAMPLE_CATEGORIES) {
+    const existing = await ctx.db.query('serviceCategories').withIndex('by_slug', (q) => q.eq('slug', c.slug)).first()
+    if (existing && existing.isDemo && !opts.isDemo) await ctx.db.patch('serviceCategories', existing._id, { isDemo: false, updatedAt: now })
+    categoryIds.set(c.slug, existing?._id ?? (await ctx.db.insert('serviceCategories', { ...c, isDemo: opts.isDemo, updatedAt: now })))
+  }
+
+  const serviceIds = new Map<string, Id<'services'>>()
+  for (const { category, ...s } of SAMPLE_SERVICES) {
+    const slug = slugOf(s.slug)
+    const existing = await ctx.db.query('services').withIndex('by_slug', (q) => q.eq('slug', slug)).first()
+    serviceIds.set(
+      slug,
+      existing?._id ??
+        (await ctx.db.insert('services', {
+          ...s,
+          slug,
+          name: opts.isDemo ? `${s.name} (demo)` : s.name,
+          categoryId: categoryIds.get(category),
+          isActive: true,
+          isDemo: opts.isDemo,
+          updatedAt: now,
+        })),
+    )
+  }
+  return serviceIds
+}
+
+export const sampleMenu = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    await insertMenu(ctx, { isDemo: false })
+    return null
+  },
+})
+
+// ── Development demo data ────────────────────────────────────────────────────
 const DEMO_STYLISTS = [
   { slug: 'demo-stylist-one', displayName: 'Stylist One (demo)', title: 'Braids specialist', sortOrder: 10, services: ['demo-knotless-braids', 'demo-stitch-braids', 'demo-curls-styling', 'demo-bridal-styling'] },
   { slug: 'demo-stylist-two', displayName: 'Stylist Two (demo)', title: 'Colour specialist', sortOrder: 20, services: ['demo-colour-highlights', 'demo-balayage', 'demo-silk-press', 'demo-deep-treatment'] },
-  { slug: 'demo-stylist-three', displayName: 'Stylist Three (demo)', title: 'Stylist', sortOrder: 30, services: DEMO_SERVICES.map((s) => s.slug) },
+  { slug: 'demo-stylist-three', displayName: 'Stylist Three (demo)', title: 'Stylist', sortOrder: 30, services: SAMPLE_SERVICES.map((s) => `demo-${s.slug}`) },
 ]
 
 export const demo = internalMutation({
@@ -143,29 +212,7 @@ export const demo = internalMutation({
     if (env.ALLOW_DEMO_SEED !== 'true') fail('DEMO_SEED_DISABLED')
     await seedVerified(ctx)
     const now = Date.now()
-
-    const categoryIds = new Map<string, Id<'serviceCategories'>>()
-    for (const c of DEMO_CATEGORIES) {
-      const existing = await ctx.db.query('serviceCategories').withIndex('by_slug', (q) => q.eq('slug', c.slug)).first()
-      categoryIds.set(c.slug, existing?._id ?? (await ctx.db.insert('serviceCategories', { ...c, isDemo: true, updatedAt: now })))
-    }
-
-    const serviceIds = new Map<string, Id<'services'>>()
-    for (const { category, ...s } of DEMO_SERVICES) {
-      const existing = await ctx.db.query('services').withIndex('by_slug', (q) => q.eq('slug', s.slug)).first()
-      serviceIds.set(
-        s.slug,
-        existing?._id ??
-          (await ctx.db.insert('services', {
-            ...s,
-            categoryId: categoryIds.get(category),
-            description: 'Illustrative demo service. Real menu, pricing and timings are set by the salon in the dashboard.',
-            isActive: true,
-            isDemo: true,
-            updatedAt: now,
-          })),
-      )
-    }
+    const serviceIds = await insertMenu(ctx, { isDemo: true })
 
     for (const st of DEMO_STYLISTS) {
       if (await ctx.db.query('stylists').withIndex('by_slug', (q) => q.eq('slug', st.slug)).first()) continue

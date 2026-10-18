@@ -18,7 +18,9 @@ export const metadata: Metadata = pageMetadata({
 export default async function BookPage() {
   const [settings, services, stylists] = await Promise.all([getSettings(), getServices(), getStylists()])
   const demoPreview = !isConvexConfigured && isDemoContentEnabled
-  const open = (settings.onlineBookingEnabled || demoPreview) && services.length > 0
+  // Opens only once some stylist can take one of the listed services online.
+  const bookable = stylists.some((s) => s.acceptsOnlineBooking && services.some((service) => s.serviceIds.includes(service.id)))
+  const open = (settings.onlineBookingEnabled || demoPreview) && bookable
 
   return (
     <>

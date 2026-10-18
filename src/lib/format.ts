@@ -34,6 +34,11 @@ export function mapsSearchHref(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
+/** What the embedded map should show: the exact pin when coordinates are known, else the address. */
+export function mapQuery(place: { name: string; latitude: number | null; longitude: number | null }, address: string): string {
+  return place.latitude !== null && place.longitude !== null ? `${place.latitude},${place.longitude}` : `${place.name}, ${address}`
+}
+
 export function initials(name: string): string {
   return name
     .split(/\s+/)

@@ -18,9 +18,9 @@ export const fallbackSettings: BusinessSettings = {
   addressLine: verifiedBusiness.addressLine,
   city: verifiedBusiness.city,
   countryCode: verifiedBusiness.countryCode,
-  mapUrl: null,
-  latitude: null,
-  longitude: null,
+  mapUrl: verifiedBusiness.mapUrl,
+  latitude: verifiedBusiness.latitude,
+  longitude: verifiedBusiness.longitude,
   socials: {},
   aboutStory: null,
   policyText:

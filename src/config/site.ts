@@ -16,6 +16,10 @@ export const verifiedBusiness = {
   addressLine: 'Ednamoll Street',
   city: 'Addis Ababa',
   countryCode: 'ET',
+  // The salon's Google Maps pin ("Orange Salon ኦሬንጅ ሳሎን").
+  mapUrl: 'https://maps.app.goo.gl/v35jnnonHKEXdFyr8',
+  latitude: 8.9949867,
+  longitude: 38.7851034,
 } as const
 
 /** 0 = Sunday … 6 = Saturday, salon-local wall-clock times. */

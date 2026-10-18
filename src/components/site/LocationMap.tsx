@@ -9,7 +9,7 @@ import { MapPin } from 'lucide-react'
  */
 export function LocationMap({ query, label, className = 'aspect-[4/3]' }: { query: string; label: string; className?: string }) {
   const [loaded, setLoaded] = useState(false)
-  const src = `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
+  const src = `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=17&output=embed`
   return (
     <div className={`relative w-full overflow-hidden rounded-sm bg-charcoal-700 ${className}`}>
       {loaded ? (

@@ -6,7 +6,7 @@ import { PageHero } from '@/components/site/PageHero'
 import { SocialLinks } from '@/components/site/SocialLinks'
 import { ButtonAnchor, ButtonLink } from '@/components/ui/Button'
 import { getBusinessHours, getSettings } from '@/lib/data/public'
-import { formatPhone, mapsSearchHref, telHref, whatsappHref } from '@/lib/format'
+import { formatPhone, mapQuery, mapsSearchHref, telHref, whatsappHref } from '@/lib/format'
 import { groupHours } from '@/lib/hours'
 import { pageMetadata } from '@/lib/seo'
 
@@ -100,7 +100,7 @@ export default async function ContactPage() {
 
       <section className="bg-charcoal-800 py-16">
         <div className="container-x">
-          <LocationMap query={`${settings.name}, ${address}`} label={`${settings.name}, ${address}`} className="aspect-[4/3] md:aspect-[21/8]" />
+          <LocationMap query={mapQuery(settings, address)} label={`${settings.name}, ${address}`} className="aspect-[4/3] md:aspect-[21/8]" />
         </div>
       </section>
     </>

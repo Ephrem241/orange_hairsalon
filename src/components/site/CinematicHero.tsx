@@ -40,16 +40,6 @@ export function CinematicHero({ city }: { city: string }) {
           </div>
         </div>
       </div>
-
-      <a
-        href="#introduction"
-        className="absolute bottom-7 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 text-ivory/70 transition-colors hover:text-gold md:flex"
-      >
-        <span aria-hidden className="flex h-9 w-5.5 justify-center rounded-full border border-current pt-1.5">
-          <span className="block h-2 w-0.5 animate-scroll-cue rounded-full bg-current" />
-        </span>
-        <span className="text-[0.6875rem] tracking-[0.2em] uppercase">Scroll</span>
-      </a>
     </section>
   )
 }

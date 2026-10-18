@@ -10,7 +10,7 @@ import { SectionHeading } from '@/components/site/SectionHeading'
 import { ServiceCard } from '@/components/site/ServiceCard'
 import { StylistCard } from '@/components/site/StylistCard'
 import { ButtonAnchor, ButtonLink } from '@/components/ui/Button'
-import { formatPhone, mapsSearchHref, telHref } from '@/lib/format'
+import { formatPhone, mapQuery, mapsSearchHref, telHref } from '@/lib/format'
 import { groupHours } from '@/lib/hours'
 import type { BusinessHours, BusinessSettings, GalleryItem, Review, Service, Stylist } from '@/lib/types'
 
@@ -359,7 +359,7 @@ export function VisitSection({ settings, hours }: { settings: BusinessSettings; 
           </div>
         </Reveal>
         <Reveal delay={150}>
-          <LocationMap query={`${settings.name}, ${address}`} label={`${settings.name}, ${address}`} />
+          <LocationMap query={mapQuery(settings, address)} label={`${settings.name}, ${address}`} />
         </Reveal>
       </div>
     </section>

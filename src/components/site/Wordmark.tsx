@@ -1,16 +1,16 @@
 import { cn } from '@/lib/cn'
 
-/** Typographic wordmark: ORANGE over a widely tracked SALON, as in the brand campaign. */
+/** Typographic wordmark: Orange over a widely tracked SALON, as in the brand campaign. */
 export function Wordmark({ tone = 'light', className }: { tone?: 'light' | 'dark'; className?: string }) {
   return (
     <span className={cn('inline-flex flex-col items-center leading-none select-none', className)}>
       <span
         className={cn(
-          'font-serif text-[1.6rem] tracking-[0.14em] md:text-[1.85rem]',
+          'font-serif text-[1.6rem] tracking-[0.06em] md:text-[1.85rem]',
           tone === 'light' ? 'text-gold' : 'text-gold-700',
         )}
       >
-        ORANGE
+        Orange
       </span>
       <span
         className={cn(

@@ -51,12 +51,11 @@ const videoJobs = {
     mkdirSync(dirname(base), { recursive: true })
     ffmpeg(['-i', input, '-vf', `scale=1280:-2,${GRADE}`, '-r', '24', ...h264(25), `${base}.mp4`])
     ffmpeg(['-i', input, '-vf', `scale=1280:-2,${GRADE}`, '-r', '24', ...vp9(36), `${base}.webm`])
-    // Portrait centre crop for phones: same pixel density, a third of the bytes.
-    ffmpeg(['-i', input, '-vf', `crop=ih*9/16:ih,scale=-2:720,${GRADE}`, '-r', '24', ...h264(27), `${base}-mobile.mp4`])
+    // Whole frame at 480p for phones: the hero shows the film uncropped on every screen.
+    ffmpeg(['-i', input, '-vf', `scale=854:-2,${GRADE}`, '-r', '24', ...h264(27), `${base}-mobile.mp4`])
     mkdirSync(out('images/hero'), { recursive: true })
     ffmpeg(['-i', input, '-vf', `scale=1600:-2,${GRADE}`, '-frames:v', '1', '-q:v', '3', out('images/hero/hero-poster.jpg')])
-    ffmpeg(['-i', input, '-vf', `crop=ih*9/16:ih,scale=-2:1280,${GRADE}`, '-frames:v', '1', '-q:v', '3', out('images/hero/hero-poster-mobile.jpg')])
-    for (const f of [`${base}.mp4`, `${base}.webm`, `${base}-mobile.mp4`, out('images/hero/hero-poster.jpg'), out('images/hero/hero-poster-mobile.jpg')]) report(f)
+    for (const f of [`${base}.mp4`, `${base}.webm`, `${base}-mobile.mp4`, out('images/hero/hero-poster.jpg')]) report(f)
   },
 
   // Braid flip (HEVC master, unplayable in several browsers) → ambient CTA band.

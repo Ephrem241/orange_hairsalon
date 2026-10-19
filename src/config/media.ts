@@ -7,7 +7,7 @@
 export type VideoAsset = {
   /** Sources in preference order; the browser plays the first it supports. */
   sources: { src: string; type: string }[]
-  /** Lighter portrait-cropped source for narrow screens (optional). */
+  /** Lighter source for narrow screens (optional). */
   mobileSource?: { src: string; type: string }
   poster: string
   mobilePoster?: string
@@ -22,7 +22,6 @@ export const heroFilm: VideoAsset = {
   ],
   mobileSource: { src: '/videos/orange-salon-hero-mobile.mp4', type: 'video/mp4' },
   poster: '/images/hero/hero-poster.jpg',
-  mobilePoster: '/images/hero/hero-poster-mobile.jpg',
   posterWidth: 1600,
   posterHeight: 900,
 }

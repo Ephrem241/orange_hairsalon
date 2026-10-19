@@ -108,7 +108,8 @@ export function Footer({ settings, hours, services }: { settings: BusinessSettin
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
             <li><Link href="/privacy" className="hover:text-gold">Privacy</Link></li>
             <li><Link href="/terms" className="hover:text-gold">Booking terms</Link></li>
-            <li><Link href="/admin" className="hover:text-gold">Staff</Link></li>
+            {/* Not prefetched: signed out, the prefetch would cache the redirect to the login page. */}
+            <li><Link href="/admin" prefetch={false} className="hover:text-gold">Staff</Link></li>
           </ul>
         </div>
       </div>

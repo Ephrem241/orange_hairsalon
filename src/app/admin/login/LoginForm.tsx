@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, TextInput } from '@/components/ui/Field'
@@ -8,9 +7,13 @@ import { signInWithPassword, signOutOfDashboard } from '@/lib/auth/client'
 import { confirmStaffAccess, prepareSignIn } from './actions'
 
 export function LoginForm() {
-  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  const fail = (message: string) => {
+    setError(message)
+    setPending(false)
+  }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -22,18 +25,17 @@ export function LoginForm() {
     setError(null)
     try {
       const prepared = await prepareSignIn(email)
-      if (prepared.error) return setError(prepared.error)
-      if (!(await signInWithPassword(email, password))) return setError('Email or password is incorrect.')
+      if (prepared.error) return fail(prepared.error)
+      if (!(await signInWithPassword(email, password))) return fail('Email or password is incorrect.')
       if (!(await confirmStaffAccess())) {
         await signOutOfDashboard()
-        return setError('This account does not have dashboard access. Ask the salon owner.')
+        return fail('This account does not have dashboard access. Ask the salon owner.')
       }
-      router.replace('/admin')
-      router.refresh()
+      // A full page load, not router.replace: the client router may still hold the
+      // redirect to this page that it prefetched for /admin while signed out.
+      window.location.replace('/admin')
     } catch {
-      setError('Something went wrong. Please try again.')
-    } finally {
-      setPending(false)
+      fail('Something went wrong. Please try again.')
     }
   }
 

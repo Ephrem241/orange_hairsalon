@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   Bell, CalendarDays, ClipboardList, Contact, GalleryHorizontalEnd, LayoutDashboard, LogOut, Menu, MessageSquare,
@@ -48,7 +48,6 @@ const ROLE_LABEL: Record<StaffRole, string> = { admin: 'Owner / admin', receptio
 
 export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
   const pathname = usePathname()
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const active = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href))
 
@@ -92,8 +91,8 @@ export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
           type="button"
           onClick={async () => {
             await signOutOfDashboard()
-            router.replace('/admin/login')
-            router.refresh()
+            // A full page load also drops the dashboard pages the client router has cached.
+            window.location.replace('/admin/login')
           }}
           className="mt-2 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ivory/60 hover:bg-ivory/5 hover:text-ivory"
         >

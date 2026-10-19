@@ -3,17 +3,25 @@ import { ButtonLink } from '@/components/ui/Button'
 import { VideoBackground } from './VideoBackground'
 
 /**
- * Homepage hero: the whole film, never cropped. It sits below the fixed header
- * in an exact 16:9 frame capped to the viewport height. On laptops and wider
- * the headline reads over the film's lower-left corner; on phones and tablets
- * it follows underneath so nothing covers the film.
+ * Homepage hero: the film fills the full width below the fixed header at 16:9,
+ * capped to the viewport height, so on wide, short screens a little of the top
+ * and bottom is trimmed; phones and tablets show the whole frame. On laptops
+ * and wider the headline reads over the film's lower-left corner; on phones
+ * and tablets it follows underneath so nothing covers the film.
  */
 export function CinematicHero({ city }: { city: string }) {
   return (
     <section aria-labelledby="hero-title" className="relative isolate bg-charcoal pt-20 text-ivory">
-      <div className="relative mx-auto w-full max-w-[calc((100svh-5rem)*16/9)]">
-        <div className="film-grain relative aspect-video w-full overflow-hidden">
-          <VideoBackground asset={heroFilm} priority controlLabel="hero film" controlClassName="bottom-3 right-3 xl:bottom-6 xl:right-6" />
+      <div className="relative w-full">
+        <div className="film-grain relative aspect-video max-h-[calc(100svh-5rem)] w-full overflow-hidden">
+          {/* When the height cap trims the frame, keep the faces near the top and trim mostly from the bottom. */}
+          <VideoBackground
+            asset={heroFilm}
+            priority
+            mediaClassName="object-[50%_20%]"
+            controlLabel="hero film"
+            controlClassName="bottom-3 right-3 xl:bottom-6 xl:right-6"
+          />
 
           {/* Grade only behind the large-screen copy; the rest of the film stays clear. */}
           <div aria-hidden className="absolute inset-0 hidden bg-gradient-to-tr from-charcoal/85 via-charcoal/30 via-35% to-transparent to-60% xl:block" />

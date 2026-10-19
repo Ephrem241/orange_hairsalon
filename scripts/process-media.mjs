@@ -51,7 +51,7 @@ const videoJobs = {
     mkdirSync(dirname(base), { recursive: true })
     ffmpeg(['-i', input, '-vf', `scale=1280:-2,${GRADE}`, '-r', '24', ...h264(25), `${base}.mp4`])
     ffmpeg(['-i', input, '-vf', `scale=1280:-2,${GRADE}`, '-r', '24', ...vp9(36), `${base}.webm`])
-    // Whole frame at 480p for phones: the hero shows the film uncropped on every screen.
+    // Whole frame at 480p for phones, which show the hero film uncropped.
     ffmpeg(['-i', input, '-vf', `scale=854:-2,${GRADE}`, '-r', '24', ...h264(27), `${base}-mobile.mp4`])
     mkdirSync(out('images/hero'), { recursive: true })
     ffmpeg(['-i', input, '-vf', `scale=1600:-2,${GRADE}`, '-frames:v', '1', '-q:v', '3', out('images/hero/hero-poster.jpg')])

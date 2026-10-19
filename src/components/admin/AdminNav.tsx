@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
-  Bell, CalendarDays, ClipboardList, Contact, GalleryHorizontalEnd, LayoutDashboard, LogOut, Menu, MessageSquare,
-  Scissors, Settings, ShieldCheck, Star, UserCog, Users, X, type LucideIcon,
+  ArrowUpRight, Bell, CalendarDays, ClipboardList, Contact, GalleryHorizontalEnd, Globe, LayoutDashboard, LogOut, Menu,
+  MessageSquare, Scissors, Settings, ShieldCheck, Star, UserCog, Users, X, type LucideIcon,
 } from 'lucide-react'
 import { Wordmark } from '@/components/site/Wordmark'
 import { signOutOfDashboard } from '@/lib/auth/client'
@@ -52,7 +52,8 @@ export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
   const active = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href))
 
   const nav = (
-    <nav aria-label="Dashboard" className="flex h-full flex-col">
+    // min-h-0 lets the link list scroll on short screens, keeping Sign out on screen.
+    <nav aria-label="Dashboard" className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 space-y-7 overflow-y-auto px-3 py-6">
         {SECTIONS.map((section) => {
           const items = section.items.filter((i) => i.roles.includes(role))
@@ -87,6 +88,18 @@ export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
           <p className="truncate text-sm text-ivory">{name}</p>
           <p className="text-xs text-ivory/50">{ROLE_LABEL[role]}</p>
         </Link>
+        <Link
+          href="/"
+          target="_blank"
+          rel="noopener"
+          prefetch={false}
+          onClick={() => setOpen(false)}
+          className="mt-2 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ivory/60 hover:bg-ivory/5 hover:text-ivory"
+        >
+          <Globe aria-hidden className="size-4" /> View website
+          <ArrowUpRight aria-hidden className="ml-auto size-3.5" />
+          <span className="sr-only">(opens in a new tab)</span>
+        </Link>
         <button
           type="button"
           onClick={async () => {
@@ -94,7 +107,7 @@ export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
             // A full page load also drops the dashboard pages the client router has cached.
             window.location.replace('/admin/login')
           }}
-          className="mt-2 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ivory/60 hover:bg-ivory/5 hover:text-ivory"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ivory/60 hover:bg-ivory/5 hover:text-ivory"
         >
           <LogOut aria-hidden className="size-4" /> Sign out
         </button>
@@ -105,7 +118,7 @@ export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-charcoal lg:flex">
-        <Link href="/admin" className="flex h-16 items-center px-6" aria-label="Dashboard home">
+        <Link href="/admin" className="flex h-16 shrink-0 items-center px-6" aria-label="Dashboard home">
           <Wordmark className="scale-90" />
         </Link>
         {nav}
@@ -120,7 +133,7 @@ export function AdminNav({ role, name }: { role: StaffRole; name: string }) {
         </button>
       </header>
       {open && (
-        <div id="admin-mobile-nav" className="fixed inset-x-0 top-14 bottom-0 z-30 bg-charcoal lg:hidden">
+        <div id="admin-mobile-nav" className="fixed inset-x-0 top-14 bottom-0 z-30 flex flex-col bg-charcoal lg:hidden">
           {nav}
         </div>
       )}

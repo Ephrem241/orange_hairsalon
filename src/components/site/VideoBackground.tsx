@@ -12,6 +12,8 @@ type Props = {
   /** Above-the-fold hero: load the poster eagerly and the video straight away. */
   priority?: boolean
   className?: string
+  /** Extra classes for the poster and video, e.g. an object position to steer the crop. */
+  mediaClassName?: string
   /** Label for the pause control (WCAG 2.2.2: moving content must be pausable). */
   controlLabel?: string
   controlClassName?: string
@@ -24,7 +26,9 @@ type Props = {
  * hidden, and non-priority videos are not even mounted until they approach
  * the viewport.
  */
-export function VideoBackground({ asset, priority = false, className, controlLabel = 'background video', controlClassName }: Props) {
+export function VideoBackground({
+  asset, priority = false, className, mediaClassName, controlLabel = 'background video', controlClassName,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [decision, setDecision] = useState<PlaybackDecision | null>(null)
@@ -101,7 +105,7 @@ export function VideoBackground({ asset, priority = false, className, controlLab
           {...imgProps}
           fetchPriority={priority ? 'high' : 'auto'}
           loading={priority ? 'eager' : 'lazy'}
-          className={cn('absolute inset-0 size-full object-cover', priority && 'animate-slow-zoom')}
+          className={cn('absolute inset-0 size-full object-cover', priority && 'animate-slow-zoom', mediaClassName)}
         />
       </picture>
 
@@ -111,6 +115,7 @@ export function VideoBackground({ asset, priority = false, className, controlLab
           className={cn(
             'absolute inset-0 size-full object-cover transition-opacity duration-[1600ms] ease-[var(--ease-cinematic)]',
             ready ? 'opacity-100' : 'opacity-0',
+            mediaClassName,
           )}
           muted
           loop

@@ -5,14 +5,15 @@ import { z } from 'zod'
 import { getStaff } from '@/lib/auth/staff'
 import { allowRequest, clientIp } from '@/lib/security/rate-limit'
 
-const credentials = z.object({
-  email: z.email('Enter your email address.'),
-  password: z.string().min(1, 'Enter your password.'),
-})
+const emailSchema = z.email('Enter your email address.')
 
-/** Validates the form and applies the per-IP limit before the browser signs in. */
-export async function prepareSignIn(email: string, password: string): Promise<{ error: string | null }> {
-  const parsed = credentials.safeParse({ email: email.trim().toLowerCase(), password })
+/**
+ * Validates the email and applies the per-IP limit before the browser signs in.
+ * The password never comes through here: it goes only to /api/auth, so it can't
+ * appear in server-action logs.
+ */
+export async function prepareSignIn(email: string): Promise<{ error: string | null }> {
+  const parsed = emailSchema.safeParse(email.trim().toLowerCase())
   if (!parsed.success) return { error: parsed.error.issues[0].message }
   if (!(await allowRequest('login:ip', clientIp(await headers()), 10, 900))) {
     return { error: 'Too many sign-in attempts. Please wait 15 minutes.' }

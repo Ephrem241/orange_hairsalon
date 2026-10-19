@@ -17,10 +17,11 @@ export function LoginForm() {
     const form = new FormData(event.currentTarget)
     const email = String(form.get('email') ?? '').trim().toLowerCase()
     const password = String(form.get('password') ?? '')
+    if (!password) return setError('Enter your password.')
     setPending(true)
     setError(null)
     try {
-      const prepared = await prepareSignIn(email, password)
+      const prepared = await prepareSignIn(email)
       if (prepared.error) return setError(prepared.error)
       if (!(await signInWithPassword(email, password))) return setError('Email or password is incorrect.')
       if (!(await confirmStaffAccess())) {

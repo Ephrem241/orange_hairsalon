@@ -64,6 +64,19 @@ test.describe('homepage', () => {
   })
 })
 
+test.describe('inner pages', () => {
+  test('banners play the hero film over its poster', async ({ page }) => {
+    for (const path of ['/services', '/gallery', '/about', '/contact', '/book']) {
+      await page.goto(path)
+      const banner = page.getByRole('heading', { level: 1 }).locator('xpath=ancestor::section')
+      // Desktop and phone cuts share the name, so this holds on both projects.
+      await expect(banner.locator('video source').first(), path).toHaveAttribute('src', /orange-salon-hero/)
+      await expect(banner.locator('picture img'), path).toHaveAttribute('src', /hero-poster/)
+      await expect(banner.getByRole('button', { name: /pause background film/i }), path).toBeVisible()
+    }
+  })
+})
+
 test.describe('navigation', () => {
   test('mobile menu opens, traps focus and closes with Escape', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'mobile only')

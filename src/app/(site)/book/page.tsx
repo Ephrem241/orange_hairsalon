@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { Info, Phone } from 'lucide-react'
+import { heroFilm } from '@/config/media'
 import { BookingWizard } from '@/components/booking/BookingWizard'
 import { PageHero } from '@/components/site/PageHero'
 import { ButtonAnchor, ButtonLink } from '@/components/ui/Button'
@@ -29,8 +30,7 @@ export default async function BookPage() {
         eyebrow="Book your appointment"
         title="Reserve your chair"
         description="Choose a service, a stylist and a time. No account needed — you’ll get a booking reference straight away."
-        image={{ src: '/images/gallery/burgundy-waves-highlights.jpg', alt: '' }}
-        imagePosition="center 30%"
+        video={heroFilm}
       />
       <section className="bg-ivory py-14 md:py-20">
         <div className="container-x">

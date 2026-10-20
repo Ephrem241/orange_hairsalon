@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { heroFilm } from '@/config/media'
 import { GalleryExplorer } from '@/components/site/GalleryExplorer'
 import { PageHero } from '@/components/site/PageHero'
 import { getGallery } from '@/lib/data/public'
@@ -21,8 +22,7 @@ export default async function GalleryPage() {
         eyebrow="Our work"
         title="Signature transformations"
         description="Photographed in our salon on Ednamoll Street. Every look here is real Orange Salon client work unless it is labelled illustrative."
-        image={{ src: '/images/gallery/copper-passion-twists.jpg', alt: '' }}
-        imagePosition="center 35%"
+        video={heroFilm}
       />
       <section className="bg-charcoal pb-24 text-ivory">
         <div className="container-x">

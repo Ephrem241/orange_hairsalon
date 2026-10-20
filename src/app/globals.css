@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Phones held sideways: too short for a full-width 16:9 film below the header. */
+@custom-variant short-landscape (@media (orientation: landscape) and (max-height: 32rem));
+
 /*
  * Orange Salon design tokens.
  * Contrast notes (WCAG AA): gold on charcoal 5.8:1, taupe on charcoal 5.4:1.

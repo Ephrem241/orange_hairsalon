@@ -4,17 +4,18 @@ import { VideoBackground } from './VideoBackground'
 
 /**
  * Homepage hero: the film fills the full width below the fixed header at 16:9,
- * capped to the viewport height, so on wide, short screens a little of the top
- * and bottom is trimmed; phones and tablets show the whole frame. On laptops
- * and wider the headline reads over the film's lower-left corner; on phones
- * and tablets it follows underneath so nothing covers the film.
+ * capped to the viewport height, so on wide desktop screens a little of the top
+ * and bottom is trimmed. Phones and tablets show the whole frame; phones held
+ * sideways get it centred at the height available rather than trimmed. On
+ * laptops and wider the headline reads over the film's lower-left corner; on
+ * phones and tablets it follows underneath so nothing covers the film.
  */
 export function CinematicHero({ city }: { city: string }) {
   return (
     <section aria-labelledby="hero-title" className="relative isolate bg-charcoal pt-20 text-ivory">
       <div className="relative w-full">
-        <div className="film-grain relative aspect-video max-h-[calc(100svh-5rem)] w-full overflow-hidden">
-          {/* When the height cap trims the frame, keep the faces near the top and trim mostly from the bottom. */}
+        <div className="film-grain relative aspect-video max-h-[calc(100svh-5rem)] w-full overflow-hidden short-landscape:mx-auto short-landscape:max-w-[calc((100svh-5rem)*16/9)]">
+          {/* When the height cap trims the frame on wide desktops, keep the faces near the top and trim mostly from the bottom. */}
           <VideoBackground
             asset={heroFilm}
             priority

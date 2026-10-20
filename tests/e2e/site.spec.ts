@@ -39,6 +39,20 @@ test.describe('homepage', () => {
     await context.close()
   })
 
+  test('shows the whole hero film on phones, upright or sideways', async ({ browser }) => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      const context = await browser.newContext({ viewport, hasTouch: true })
+      const page = await context.newPage()
+      await page.goto('/')
+      const box = await page.locator('#hero-title').locator('xpath=ancestor::section').locator('.film-grain').boundingBox()
+      expect(box).not.toBeNull()
+      // An exact 16:9 box means object-cover trims nothing, and it fits on screen below the header.
+      expect(Math.abs(box!.height - (box!.width * 9) / 16)).toBeLessThanOrEqual(1)
+      expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height)
+      await context.close()
+    }
+  })
+
   test('publishes HairSalon structured data from verified settings', async ({ page }) => {
     await page.goto('/')
     const json = await page.locator('script[type="application/ld+json"]').first().textContent()

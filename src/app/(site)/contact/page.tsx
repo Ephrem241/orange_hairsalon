@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
+import { heroFilm } from '@/config/media'
 import { ContactForm } from '@/components/site/ContactForm'
 import { LocationMap } from '@/components/site/LocationMap'
 import { PageHero } from '@/components/site/PageHero'
@@ -27,8 +28,7 @@ export default async function ContactPage() {
         eyebrow="Contact"
         title="We’d love to see you"
         description="Call or message us to book, ask about a style, or find your way to the salon."
-        image={{ src: '/images/gallery/burgundy-waves-neon-sign.jpg', alt: '' }}
-        imagePosition="center 20%"
+        video={heroFilm}
       >
         <div className="flex flex-wrap gap-3">
           {settings.phone && (

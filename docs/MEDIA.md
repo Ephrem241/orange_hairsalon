@@ -4,7 +4,7 @@ Source files live in `images/` and are never served directly. `scripts/process-m
 
 | Output | Source | Notes |
 |---|---|---|
-| `public/videos/orange-salon-hero.{webm,mp4}` | `images/hero.mp4` | 1280px, 24 fps, no audio, light film grade, ~1 MB each |
+| `public/videos/orange-salon-hero.{webm,mp4}` | `images/hero.mp4` | 1280px, 24 fps, no audio, light film grade, ~1 MB each. Also plays, darkened, behind the inner-page banners |
 | `public/videos/orange-salon-hero-mobile.mp4` | same | Whole frame at 480p for phones |
 | `public/images/hero/hero-poster.jpg` | first frame | Shown instantly; the film fades in over it |
 | `public/videos/braids-in-motion.{webm,mp4}` + poster | `images/hair style 9.mp4` | Warm duotone strip behind the booking CTA (the master is HEVC, which several browsers can't play) |

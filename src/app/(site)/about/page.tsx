@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
-import { aboutPhoto, neonSignPhoto } from '@/config/media'
+import { aboutPhoto, heroFilm, neonSignPhoto } from '@/config/media'
 import { CtaBand } from '@/components/site/CtaBand'
 import { PageHero } from '@/components/site/PageHero'
 import { Reveal } from '@/components/site/Reveal'
@@ -40,8 +40,7 @@ export default async function AboutPage() {
         eyebrow="About Orange Salon"
         title="More than a salon. It’s an experience."
         description={`A warm, modern space on ${settings.addressLine ?? 'Ednamoll Street'} in ${settings.city}, where great hair builds confidence.`}
-        image={{ src: aboutPhoto.src, alt: '' }}
-        imagePosition="center 25%"
+        video={heroFilm}
       />
 
       {settings.aboutStory && (

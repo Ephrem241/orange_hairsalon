@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { Phone } from 'lucide-react'
+import { heroFilm } from '@/config/media'
 import { PageHero } from '@/components/site/PageHero'
 import { ServiceCard } from '@/components/site/ServiceCard'
 import { ServicesExplorer } from '@/components/site/ServicesExplorer'
@@ -25,8 +26,7 @@ export default async function ServicesPage() {
         eyebrow="Our services"
         title="Look good. Feel amazing."
         description="Every service begins with a consultation, so the result suits your hair, your face and your routine. Prices are in Ethiopian birr and paid at the salon."
-        image={{ src: '/images/gallery/stitch-braids-curly-ponytail.jpg', alt: '' }}
-        imagePosition="center 30%"
+        video={heroFilm}
       />
 
       <section className="bg-ivory py-20 md:py-24">
